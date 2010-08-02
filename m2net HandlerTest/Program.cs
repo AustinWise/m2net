@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using m2net;
 
-namespace MongrelClient
+namespace m2net.HandlerTest
 {
     class Program
     {

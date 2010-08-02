@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace MongrelClient
+namespace m2net
 {
-    class Connection : IDisposable
+    public class Connection : IDisposable
     {
         private static ZMQ.Context CTX;
         public const int IoThreads = 1;
@@ -48,11 +48,16 @@ namespace MongrelClient
 
         public void Send(string uuid, string conn_id, byte[] msg)
         {
+            Send(uuid, conn_id, msg, 0, msg.Length);
+        }
+
+        public void Send(string uuid, string conn_id, byte[] msg, int offset, int length)
+        {
             string header = string.Format("{0} {1}:{2}, ", uuid, conn_id.Length, conn_id);
             byte[] headerBytes = Enc.GetBytes(header);
-            byte[] data = new byte[headerBytes.Length + msg.Length];
+            byte[] data = new byte[headerBytes.Length + length];
             Array.Copy(headerBytes, data, headerBytes.Length);
-            Array.Copy(msg, 0, data, headerBytes.Length, msg.Length);
+            Array.Copy(msg, offset, data, headerBytes.Length, length);
             while (!this.resp.Send(data))
                 ;
         }
@@ -66,6 +71,11 @@ namespace MongrelClient
         public void Deliver(string uuid, string[] idents, byte[] data)
         {
             Send(uuid, string.Join(" ", idents), data);
+        }
+
+        public void Reply(Request req, byte[] msg, int offset, int length)
+        {
+            this.Send(req.Sender, req.ConnId, msg, offset, length);
         }
 
         public void Reply(Request req, byte[] msg)

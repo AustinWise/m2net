@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using Jayrock.Json;
 
-namespace MongrelClient
+namespace m2net
 {
-    class Request
+    public class Request
     {
         public string Sender { get; private set; }
         public string ConnId { get; private set; }
