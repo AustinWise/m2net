@@ -2,39 +2,62 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 
 namespace m2net
 {
-    public class Connection : IDisposable
+    public class Connection : MarshalByRefObject, IDisposable
     {
-        private static ZMQ.Context CTX;
-        public const int IoThreads = 1;
+        private ZMQ.Context CTX;
+        public const int IoThreads = 20;
         private Encoding Enc = Encoding.ASCII;
-
-        static Connection()
-        {
-            CTX = new ZMQ.Context(IoThreads);
-        }
 
         private ZMQ.Socket reqs;
         private ZMQ.Socket resp;
         private string sub_addr;
         private string pub_addr;
         public string SenderId { get; private set; }
+        private bool isRunning = true;
+        private AutoResetEvent itemsReadyToSend = new AutoResetEvent(false);
+        private Thread sendThread;
+        private Queue<byte[]> sendQ = new Queue<byte[]>();
 
         public Connection(string sender_id, string sub_addr, string pub_addr)
         {
+            CTX = new ZMQ.Context(IoThreads);
+
             this.SenderId = sender_id;
 
             reqs = CTX.Socket(ZMQ.UPSTREAM);
             reqs.Connect(sub_addr);
 
-            resp = CTX.Socket(ZMQ.PUB);
-            resp.Connect(pub_addr);
-            resp.SetSockOpt(ZMQ.IDENTITY, sender_id);
-
             this.sub_addr = sub_addr;
             this.pub_addr = pub_addr;
+
+            sendThread = new Thread(sendProc);
+            sendThread.Name = "Mongrel2 Connection send thread";
+            sendThread.IsBackground = true;
+            sendThread.Start();
+        }
+
+        private void sendProc()
+        {
+            resp = CTX.Socket(ZMQ.PUB);
+            resp.Connect(pub_addr);
+            resp.SetSockOpt(ZMQ.IDENTITY, SenderId);
+
+            while (isRunning)
+            {
+                itemsReadyToSend.WaitOne();
+                lock (sendQ)
+                {
+                    while (sendQ.Count != 0)
+                    {
+                        this.resp.Send(sendQ.Dequeue());
+                    }
+                }
+            }
+            itemsReadyToSend.Close();
         }
 
         public Request Receive()
@@ -54,12 +77,16 @@ namespace m2net
         public void Send(string uuid, string conn_id, byte[] msg, int offset, int length)
         {
             string header = string.Format("{0} {1}:{2}, ", uuid, conn_id.Length, conn_id);
+            Console.WriteLine("sending {0}", header);
             byte[] headerBytes = Enc.GetBytes(header);
             byte[] data = new byte[headerBytes.Length + length];
             Array.Copy(headerBytes, data, headerBytes.Length);
             Array.Copy(msg, offset, data, headerBytes.Length, length);
-            while (!this.resp.Send(data))
-                ;
+            lock (sendQ)
+            {
+                sendQ.Enqueue(data);
+                itemsReadyToSend.Set();
+            }
         }
 
         public void Send(string uuid, string conn_id, string msg)
@@ -110,6 +137,8 @@ namespace m2net
 
         public void Dispose()
         {
+            isRunning = false;
+            itemsReadyToSend.Set();
             reqs.Dispose();
             resp.Dispose();
         }

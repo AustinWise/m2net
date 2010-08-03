@@ -15,6 +15,14 @@ namespace m2net
         public string Body { get; private set; }
         public JsonBuffer Data { get; private set; }
 
+        public bool IsDisconnect
+        {
+            get
+            {
+                return this.Headers["METHOD"] == "JSON" && this.Data.GetMembers().Where(m => m.Name == "type").First().Buffer.GetString() == "disconnect";
+            }
+        }
+
         internal Request(string sender, string conn_id, string path, string headers, string body)
         {
             this.Sender = sender;
@@ -48,14 +56,6 @@ namespace m2net
             var body = parse_netstring(rest)[0];
 
             return new Request(sender, conn_id, path, headers, body);
-        }
-
-        public bool IsDisconnect
-        {
-            get
-            {
-                return this.Headers["METHOD"] == "JSON" && this.Data.GetMembers().Where(m => m.Name == "type").First().Buffer.GetString() == "disconnect";
-            }
         }
 
         private static string[] parse_netstring(string ns)
