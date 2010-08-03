@@ -47,6 +47,10 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\m2net.Asp\m2net.Asp.csproj">
+      <Project>{2ACAB869-28B0-4BA9-B2CE-D484F6AA0BD0}</Project>
+      <Name>m2net.Asp</Name>
+    </ProjectReference>
     <ProjectReference Include="..\m2net\m2net.csproj">
       <Project>{DD826938-5CE1-45B0-B7C0-8823FECF533C}</Project>
       <Name>m2net</Name>

@@ -12,7 +12,23 @@ namespace m2net.HandlerTest
         {
             string vboxIp = "10.5.2.206";
             var conn = new Connection("54c6755b-9628-40a4-9a2d-cc82a816345e", "tcp://" + vboxIp + ":9997", "tcp://" + vboxIp + ":9996");
+            AspNetTest(conn);
+        }
 
+        static void AspNetTest(Connection conn)
+        {
+            var srv = new Cassini.Server(conn, "/handlertest/", @"D:\Down\asp\");
+
+            srv.Start();
+
+            Console.WriteLine("press enter to exit");
+            Console.ReadLine();
+
+            srv.Stop();
+        }
+
+        static void HandlerTest(Connection conn)
+        {
             while (true)
             {
                 Console.WriteLine("WAITING FOR REQUEST");
@@ -36,5 +52,6 @@ namespace m2net.HandlerTest
                 conn.ReplyHttp(r, sb.ToString(), 200, "OK", new Dictionary<string, string>() { { "Content-Type", "text/plain" } });
             }
         }
+
     }
 }

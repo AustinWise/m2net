@@ -25,18 +25,25 @@ using System.Web.Hosting;
 
 namespace Cassini
 {
-    class Server : MarshalByRefObject
+    public class Server : MarshalByRefObject
     {
-        int _port;
         string _virtualPath;
         string _physicalPath;
         bool _shutdownInProgress;
-        Socket _socket;
         Host _host;
+        m2net.Connection _mongrel2Connection;
 
-        public Server(int port, string virtualPath, string physicalPath)
+        /// <summary>
+        /// This takes ownership of the mongrel2Connection.  It will be disposed when the server is stopped
+        /// and the connection should probably not be reused anyways due to the threading issue with
+        /// ZMQ.
+        /// </summary>
+        /// <param name="mongrel2Connection"></param>
+        /// <param name="virtualPath"></param>
+        /// <param name="physicalPath"></param>
+        public Server(m2net.Connection mongrel2Connection, string virtualPath, string physicalPath)
         {
-            _port = port;
+            _mongrel2Connection = mongrel2Connection;
             _virtualPath = virtualPath;
             _physicalPath = physicalPath.EndsWith("\\", StringComparison.Ordinal) ? physicalPath : physicalPath + "\\";
         }
@@ -45,6 +52,14 @@ namespace Cassini
         {
             // never expire the license
             return null;
+        }
+
+        public m2net.Connection Mongrel2Connection
+        {
+            get
+            {
+                return this._mongrel2Connection;
+            }
         }
 
         public string VirtualPath
@@ -63,29 +78,6 @@ namespace Cassini
             }
         }
 
-        public int Port
-        {
-            get
-            {
-                return _port;
-            }
-        }
-
-        public string RootUrl
-        {
-            get
-            {
-                if (_port != 80)
-                {
-                    return "http://localhost:" + _port + _virtualPath;
-                }
-                else
-                {
-                    return "http://localhost" + _virtualPath;
-                }
-            }
-        }
-
         //
         // Socket listening
         // 
@@ -100,22 +92,14 @@ namespace Cassini
 
         public void Start()
         {
-            try
-            {
-                _socket = CreateSocketBindAndListen(AddressFamily.InterNetwork, IPAddress.Loopback, _port);
-            }
-            catch
-            {
-                _socket = CreateSocketBindAndListen(AddressFamily.InterNetworkV6, IPAddress.IPv6Loopback, _port);
-            }
-
             ThreadPool.QueueUserWorkItem(delegate
             {
                 while (!_shutdownInProgress)
                 {
                     try
                     {
-                        Socket acceptedSocket = _socket.Accept();
+                        m2net.Request acceptedSocket = _mongrel2Connection.Receive();
+                        Console.WriteLine("got");
 
                         ThreadPool.QueueUserWorkItem(delegate
                         {
@@ -123,12 +107,12 @@ namespace Cassini
                             {
                                 var conn = new Connection(this, acceptedSocket);
 
-                                // wait for at least some input
-                                if (conn.WaitForRequestBytes() == 0)
-                                {
-                                    conn.WriteErrorAndClose(400);
-                                    return;
-                                }
+                                //// wait for at least some input
+                                //if (conn.WaitForRequestBytes() == 0)
+                                //{
+                                //    conn.WriteErrorAndClose(400);
+                                //    return;
+                                //}
 
                                 // find or create host
                                 Host host = GetHost();
@@ -157,9 +141,9 @@ namespace Cassini
 
             try
             {
-                if (_socket != null)
+                if (_mongrel2Connection != null)
                 {
-                    _socket.Close();
+                    _mongrel2Connection.Dispose();
                 }
             }
             catch
@@ -167,7 +151,7 @@ namespace Cassini
             }
             finally
             {
-                _socket = null;
+                _mongrel2Connection = null;
             }
 
             try
@@ -194,7 +178,7 @@ namespace Cassini
         // called at the end of request processing
         // to disconnect the remoting proxy for Connection object
         // and allow GC to pick it up
-        public void OnRequestEnd(Connection conn)
+        internal void OnRequestEnd(Connection conn)
         {
             RemotingServices.Disconnect(conn);
         }
@@ -219,7 +203,7 @@ namespace Cassini
                     if (host == null)
                     {
                         host = (Host)CreateWorkerAppDomainWithHost(_virtualPath, _physicalPath, typeof(Host));
-                        host.Configure(this, _port, _virtualPath, _physicalPath);
+                        host.Configure(this, _virtualPath, _physicalPath);
                         _host = host;
                     }
                 }

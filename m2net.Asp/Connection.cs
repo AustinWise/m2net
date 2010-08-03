@@ -21,19 +21,22 @@ using System.Text;
 using System.Threading;
 using System.Web;
 using System.Web.Hosting;
+using System.Linq;
 
 namespace Cassini
 {
     class Connection : MarshalByRefObject
     {
         Server _server;
-        Socket _socket;
-        string _localServerIP;
+        m2net.Request _mongrel2Request;
+        private List<byte[]> _thingsToSend = new List<byte[]>();
+        private byte[] _reencodedBody;
 
-        internal Connection(Server server, Socket socket)
+        internal Connection(Server server, m2net.Request mongrel2Request)
         {
             _server = server;
-            _socket = socket;
+            _mongrel2Request = mongrel2Request;
+            _reencodedBody = Encoding.Default.GetBytes(mongrel2Request.Body);
         }
 
         public override object InitializeLifetimeService()
@@ -42,66 +45,21 @@ namespace Cassini
             return null;
         }
 
-        public bool Connected { get { return _socket.Connected; } }
-
-        public bool IsLocal
-        {
-            get
-            {
-                string remoteIP = RemoteIP;
-                if (remoteIP == "127.0.0.1" || remoteIP == "::1")
-                    return true;
-                return LocalServerIP.Equals(remoteIP);
-            }
-        }
-
-        string LocalServerIP
-        {
-            get
-            {
-                if (_localServerIP == null)
-                {
-                    var hostEntry = Dns.GetHostEntry(Environment.MachineName);
-                    var localAddress = hostEntry.AddressList[0];
-                    _localServerIP = localAddress.ToString();
-                }
-
-                return _localServerIP;
-            }
-        }
-
-        public string LocalIP
-        {
-            get
-            {
-                IPEndPoint ep = (IPEndPoint)_socket.LocalEndPoint;
-                return (ep != null && ep.Address != null) ? ep.Address.ToString() : "127.0.0.1";
-            }
-        }
-
-        public string RemoteIP
-        {
-            get
-            {
-                IPEndPoint ep = (IPEndPoint)_socket.RemoteEndPoint;
-                return (ep != null && ep.Address != null) ? ep.Address.ToString() : "127.0.0.1";
-            }
-        }
+        public bool Connected { get { return _mongrel2Request != null; } }
 
         public void Close()
         {
-            try
+            int totalLength = (from d in _thingsToSend select d.Length).Aggregate((a, b) => a + b);
+            byte[] data = new byte[totalLength];
+            int bytesCopied = 0;
+            foreach (var bytes in _thingsToSend)
             {
-                _socket.Shutdown(SocketShutdown.Both);
-                _socket.Close();
+                Buffer.BlockCopy(bytes, 0, data, bytesCopied, bytes.Length);
+                bytesCopied += bytes.Length;
             }
-            catch
-            {
-            }
-            finally
-            {
-                _socket = null;
-            }
+
+            _server.Mongrel2Connection.Reply(_mongrel2Request, data);
+            _mongrel2Request = null;
         }
 
         static string MakeResponseHeaders(int statusCode, string moreHeaders, int contentLength, bool keepAlive)
@@ -185,45 +143,24 @@ namespace Cassini
             return body;
         }
 
-        public byte[] ReadRequestBytes(int maxBytes)
+        public Dictionary<string, string> GetHeaders()
         {
-            try
-            {
-                if (WaitForRequestBytes() == 0)
-                {
-                    return null;
-                }
+            return _mongrel2Request.Headers;
+        }
 
-                int numBytes = _socket.Available;
-                if (numBytes > maxBytes)
-                    numBytes = maxBytes;
+        public byte[] GetBody()
+        {
+            return _reencodedBody;
+        }
 
-                int numReceived = 0;
-                byte[] buffer = new byte[numBytes];
+        public int GetBodySize()
+        {
+            return _reencodedBody.Length;
+        }
 
-                if (numBytes > 0)
-                {
-                    numReceived = _socket.Receive(buffer, 0, numBytes, SocketFlags.None);
-                }
-
-                if (numReceived < numBytes)
-                {
-                    byte[] tempBuffer = new byte[numReceived];
-
-                    if (numReceived > 0)
-                    {
-                        Buffer.BlockCopy(buffer, 0, tempBuffer, 0, numReceived);
-                    }
-
-                    buffer = tempBuffer;
-                }
-
-                return buffer;
-            }
-            catch
-            {
-                return null;
-            }
+        public string ReadRequestBody()
+        {
+            return _mongrel2Request.Body;
         }
 
         public void Write100Continue()
@@ -233,13 +170,9 @@ namespace Cassini
 
         public void WriteBody(byte[] data, int offset, int length)
         {
-            try
-            {
-                _socket.Send(data, offset, length, SocketFlags.None);
-            }
-            catch (SocketException)
-            {
-            }
+            byte[] copy = new byte[length];
+            Buffer.BlockCopy(data, offset, copy, 0, length);
+            this._thingsToSend.Add(copy);
         }
 
         public void WriteEntireResponseFromString(int statusCode, String extraHeaders, String body, bool keepAlive)
@@ -249,7 +182,7 @@ namespace Cassini
                 int bodyLength = (body != null) ? Encoding.UTF8.GetByteCount(body) : 0;
                 string headers = MakeResponseHeaders(statusCode, extraHeaders, bodyLength, keepAlive);
 
-                _socket.Send(Encoding.UTF8.GetBytes(headers + body));
+                _thingsToSend.Add(Encoding.UTF8.GetBytes(headers + body));
             }
             catch (SocketException)
             {
@@ -290,9 +223,13 @@ namespace Cassini
                 int bytesRead = fs.Read(fileBytes, 0, len);
 
                 String headers = MakeResponseHeaders(200, contentTypeHeader, bytesRead, keepAlive);
-                _socket.Send(Encoding.UTF8.GetBytes(headers));
+                byte[] headerBytes = Encoding.ASCII.GetBytes(headers);
 
-                _socket.Send(fileBytes, 0, bytesRead, SocketFlags.None);
+                byte[] data = new byte[headerBytes.Length + len];
+                Array.Copy(headerBytes, data, headerBytes.Length);
+                Array.Copy(fileBytes, 0, data, headerBytes.Length, len);
+
+                _thingsToSend.Add(data);
 
                 completed = true;
             }
@@ -319,47 +256,11 @@ namespace Cassini
             WriteErrorAndClose(statusCode, null);
         }
 
-        public void WriteErrorWithExtraHeadersAndKeepAlive(int statusCode, string extraHeaders)
-        {
-            WriteEntireResponseFromString(statusCode, extraHeaders, GetErrorResponseBody(statusCode, null), true);
-        }
-
-        public int WaitForRequestBytes()
-        {
-            int availBytes = 0;
-
-            try
-            {
-                if (_socket.Available == 0)
-                {
-                    // poll until there is data
-                    _socket.Poll(100000 /* 100ms */, SelectMode.SelectRead);
-                    if (_socket.Available == 0 && _socket.Connected)
-                    {
-                        _socket.Poll(30000000 /* 30sec */, SelectMode.SelectRead);
-                    }
-                }
-
-                availBytes = _socket.Available;
-            }
-            catch
-            {
-            }
-
-            return availBytes;
-        }
-
         public void WriteHeaders(int statusCode, String extraHeaders)
         {
             string headers = MakeResponseHeaders(statusCode, extraHeaders, -1, false);
 
-            try
-            {
-                _socket.Send(Encoding.UTF8.GetBytes(headers));
-            }
-            catch (SocketException)
-            {
-            }
+            _thingsToSend.Add(Encoding.ASCII.GetBytes(headers));
         }
     }
 }

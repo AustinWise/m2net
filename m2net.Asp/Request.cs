@@ -24,6 +24,7 @@ using System.Threading;
 using System.Web;
 using System.Web.Hosting;
 using Microsoft.Win32.SafeHandles;
+using System.Linq;
 
 namespace Cassini
 {
@@ -42,21 +43,14 @@ namespace Cassini
                 "/app_globalresources", 
                 "/app_webreferences" };
 
-        const int MaxChunkLength = 64 * 1024;
-
         Server _server;
         Host _host;
         Connection _connection;
 
+        int _bodyBytesLeft;
+
         // security permission to Assert remoting calls to _connection
         IStackWalk _connectionPermission = new PermissionSet(PermissionState.Unrestricted);
-
-        // raw request data
-        const int maxHeaderBytes = 32 * 1024;
-        byte[] _headerBytes;
-        int _startHeadersOffset;
-        int _endHeadersOffset;
-        List<ByteString> _headerByteStrings;
 
         // parsed request data
 
@@ -75,9 +69,7 @@ namespace Cassini
 
         int _contentLength;
         int _preloadedContentLength;
-        byte[] _preloadedContent;
 
-        string _allRawHeaders;
         string[][] _unknownRequestHeaders;
         string[] _knownRequestHeaders;
         bool _specialCaseStaticFileHeaders;
@@ -138,10 +130,7 @@ namespace Cassini
 
         void Reset()
         {
-            _headerBytes = null;
-            _startHeadersOffset = 0;
-            _endHeadersOffset = 0;
-            _headerByteStrings = null;
+            _bodyBytesLeft = _connection.GetBodySize();
 
             _isClientScriptPath = false;
 
@@ -158,9 +147,7 @@ namespace Cassini
 
             _contentLength = 0;
             _preloadedContentLength = 0;
-            _preloadedContent = null;
 
-            _allRawHeaders = null;
             _unknownRequestHeaders = null;
             _knownRequestHeaders = null;
             _specialCaseStaticFileHeaders = false;
@@ -169,15 +156,6 @@ namespace Cassini
         bool TryParseRequest()
         {
             Reset();
-
-            ReadAllHeaders();
-
-            if (_headerBytes == null || _endHeadersOffset < 0 ||
-                _headerByteStrings == null || _headerByteStrings.Count == 0)
-            {
-                _connection.WriteErrorAndClose(400);
-                return false;
-            }
 
             ParseRequestLine();
 
@@ -197,127 +175,31 @@ namespace Cassini
 
             ParseHeaders();
 
-            ParsePostedContent();
-
             return true;
         }
 
         bool TryReadAllHeaders()
         {
-            // read the first packet (up to 32K)
-            byte[] headerBytes = _connection.ReadRequestBytes(maxHeaderBytes);
-
-            if (headerBytes == null || headerBytes.Length == 0)
-                return false;
-
-            if (_headerBytes != null)
-            {
-                // previous partial read
-                int len = headerBytes.Length + _headerBytes.Length;
-                if (len > maxHeaderBytes)
-                    return false;
-
-                byte[] bytes = new byte[len];
-                Buffer.BlockCopy(_headerBytes, 0, bytes, 0, _headerBytes.Length);
-                Buffer.BlockCopy(headerBytes, 0, bytes, _headerBytes.Length, headerBytes.Length);
-                _headerBytes = bytes;
-            }
-            else
-            {
-                _headerBytes = headerBytes;
-            }
-
-            // start parsing
-            _startHeadersOffset = -1;
-            _endHeadersOffset = -1;
-            _headerByteStrings = new List<ByteString>();
-
-            // find the end of headers
-            ByteParser parser = new ByteParser(_headerBytes);
-
-            for (; ; )
-            {
-                ByteString line = parser.ReadLine();
-
-                if (line == null)
-                {
-                    break;
-                }
-
-                if (_startHeadersOffset < 0)
-                {
-                    _startHeadersOffset = parser.CurrentOffset;
-                }
-
-                if (line.IsEmpty)
-                {
-                    _endHeadersOffset = parser.CurrentOffset;
-                    break;
-                }
-
-                _headerByteStrings.Add(line);
-            }
-
             return true;
-        }
-
-        void ReadAllHeaders()
-        {
-            _headerBytes = null;
-
-            do
-            {
-                if (!TryReadAllHeaders())
-                {
-                    // something bad happened
-                    break;
-                }
-            }
-            while (_endHeadersOffset < 0); // found \r\n\r\n
         }
 
         void ParseRequestLine()
         {
-            ByteString requestLine = _headerByteStrings[0];
-            ByteString[] elems = requestLine.Split(' ');
+            var mongrelHeaders = _connection.GetHeaders();
 
-            if (elems == null || elems.Length < 2 || elems.Length > 3)
-            {
-                _connection.WriteErrorAndClose(400);
-                return;
-            }
+            _verb = mongrelHeaders["METHOD"];
 
-            _verb = elems[0].GetString();
+            _url = mongrelHeaders["URI"];
 
-            ByteString urlBytes = elems[1];
-            _url = urlBytes.GetString();
-
-            if (elems.Length == 3)
-            {
-                _prot = elems[2].GetString();
-            }
-            else
-            {
-                _prot = "HTTP/1.0";
-            }
+            _prot = mongrelHeaders["VERSION"];
 
             // query string
-
-            int iqs = urlBytes.IndexOf('?');
-            if (iqs > 0)
-            {
-                _queryStringBytes = urlBytes.Substring(iqs + 1).GetBytes();
-            }
-            else
-            {
-                _queryStringBytes = new byte[0];
-            }
-
-            iqs = _url.IndexOf('?');
+            int iqs = _url.IndexOf('?');
             if (iqs > 0)
             {
                 _path = _url.Substring(0, iqs);
                 _queryString = _url.Substring(iqs + 1);
+                _queryStringBytes = Encoding.ASCII.GetBytes(_queryString);
             }
             else
             {
@@ -389,29 +271,23 @@ namespace Cassini
             // construct unknown headers as array list of name1,value1,...
             var headers = new List<string>();
 
-            for (int i = 1; i < _headerByteStrings.Count; i++)
+            foreach (var kvp in _connection.GetHeaders())
             {
-                string s = _headerByteStrings[i].GetString();
+                string name = kvp.Key;
+                string value = kvp.Value;
 
-                int c = s.IndexOf(':');
-
-                if (c >= 0)
+                // remember
+                int knownIndex = GetKnownRequestHeaderIndex(name);
+                if (knownIndex >= 0)
                 {
-                    string name = s.Substring(0, c).Trim();
-                    string value = s.Substring(c + 1).Trim();
-
-                    // remember
-                    int knownIndex = GetKnownRequestHeaderIndex(name);
-                    if (knownIndex >= 0)
-                    {
-                        _knownRequestHeaders[knownIndex] = value;
-                    }
-                    else
-                    {
-                        headers.Add(name);
-                        headers.Add(value);
-                    }
+                    _knownRequestHeaders[knownIndex] = value;
                 }
+                else
+                {
+                    headers.Add(name);
+                    headers.Add(value);
+                }
+
             }
 
             // copy to array unknown headers
@@ -425,17 +301,6 @@ namespace Cassini
                 _unknownRequestHeaders[i] = new string[2];
                 _unknownRequestHeaders[i][0] = headers[j++];
                 _unknownRequestHeaders[i][1] = headers[j++];
-            }
-
-            // remember all raw headers as one string
-
-            if (_headerByteStrings.Count > 1)
-            {
-                _allRawHeaders = Encoding.UTF8.GetString(_headerBytes, _startHeadersOffset, _endHeadersOffset - _startHeadersOffset);
-            }
-            else
-            {
-                _allRawHeaders = String.Empty;
             }
         }
 
@@ -456,39 +321,7 @@ namespace Cassini
                 }
             }
 
-            if (_headerBytes.Length > _endHeadersOffset)
-            {
-                _preloadedContentLength = _headerBytes.Length - _endHeadersOffset;
-
-                if (_preloadedContentLength > _contentLength)
-                {
-                    _preloadedContentLength = _contentLength; // don't read more than the content-length
-                }
-
-                if (_preloadedContentLength > 0)
-                {
-                    _preloadedContent = new byte[_preloadedContentLength];
-                    Buffer.BlockCopy(_headerBytes, _endHeadersOffset, _preloadedContent, 0, _preloadedContentLength);
-                }
-            }
-        }
-
-        void SkipAllPostedContent()
-        {
-            if (_contentLength > 0 && _preloadedContentLength < _contentLength)
-            {
-                int bytesRemaining = (_contentLength - _preloadedContentLength);
-
-                while (bytesRemaining > 0)
-                {
-                    byte[] bytes = _connection.ReadRequestBytes(bytesRemaining);
-                    if (bytes == null || bytes.Length == 0)
-                    {
-                        return;
-                    }
-                    bytesRemaining -= bytes.Length;
-                }
-            }
+            _preloadedContentLength = _contentLength;
         }
 
         bool IsRequestForRestrictedDirectory()
@@ -690,8 +523,8 @@ namespace Cassini
 
         public override string GetRemoteAddress()
         {
-            _connectionPermission.Assert();
-            return _connection.RemoteIP;
+            //TODO: see if this needs an implementation different than the default
+            return base.GetRemoteAddress();
         }
 
         public override int GetRemotePort()
@@ -701,12 +534,13 @@ namespace Cassini
 
         public override string GetLocalAddress()
         {
-            _connectionPermission.Assert();
-            return _connection.LocalIP;
+            //TODO: see if this needs an implementation different than the default
+            return base.GetLocalAddress();
         }
 
         public override string GetServerName()
         {
+            //TODO: consider implmenting by looking at headers
             string localAddress = GetLocalAddress();
             if (localAddress.Equals("127.0.0.1"))
             {
@@ -717,7 +551,8 @@ namespace Cassini
 
         public override int GetLocalPort()
         {
-            return _host.Port;
+            //TODO: this probably should be changed to match the mongrel2 request
+            return 80;
         }
 
         public override string GetFilePath()
@@ -747,7 +582,7 @@ namespace Cassini
 
         public override byte[] GetPreloadedEntityBody()
         {
-            return _preloadedContent;
+            return _connection.GetBody();
         }
 
         public override bool IsEntireEntityBodyIsPreloaded()
@@ -757,16 +592,21 @@ namespace Cassini
 
         public override int ReadEntityBody(byte[] buffer, int size)
         {
-            int bytesRead = 0;
+            if (_bodyBytesLeft == 0)
+                return 0;
+
+            int bytesRead = size;
+            _bodyBytesLeft -= size;
+            if (_bodyBytesLeft < 0)
+            {
+                bytesRead += _bodyBytesLeft;
+                _bodyBytesLeft = 0;
+            }
 
             _connectionPermission.Assert();
-            byte[] bytes = _connection.ReadRequestBytes(size);
+            byte[] bytes = _connection.GetBody();
 
-            if (bytes != null && bytes.Length > 0)
-            {
-                bytesRead = bytes.Length;
-                Buffer.BlockCopy(bytes, 0, buffer, 0, bytesRead);
-            }
+            Buffer.BlockCopy(bytes, 0, buffer, 0, bytesRead);
 
             return bytesRead;
         }
@@ -803,7 +643,10 @@ namespace Cassini
             switch (name)
             {
                 case "ALL_RAW":
-                    s = _allRawHeaders;
+                    //this is may not be stricly correct, as it includes headers that mongrel2 adds in
+                    //and also this has not be checked to strictly conform to the format
+                    //that Casinni uses.
+                    s = string.Join("\r\n", _connection.GetHeaders().Select(h => h.Key + ": " + h.Value).ToArray());
                     break;
 
                 case "SERVER_PROTOCOL":
@@ -1035,32 +878,9 @@ namespace Cassini
                 f.Seek(offset, SeekOrigin.Begin);
             }
 
-            if (length <= MaxChunkLength)
-            {
-                byte[] fileBytes = new byte[(int)length];
-                int bytesRead = f.Read(fileBytes, 0, (int)length);
-                SendResponseFromMemory(fileBytes, bytesRead);
-            }
-            else
-            {
-                byte[] chunk = new byte[MaxChunkLength];
-                int bytesRemaining = (int)length;
-
-                while (bytesRemaining > 0)
-                {
-                    int bytesToRead = (bytesRemaining < MaxChunkLength) ? bytesRemaining : MaxChunkLength;
-                    int bytesRead = f.Read(chunk, 0, bytesToRead);
-
-                    SendResponseFromMemory(chunk, bytesRead);
-                    bytesRemaining -= bytesRead;
-
-                    // flush to release keep memory
-                    if ((bytesRemaining > 0) && (bytesRead > 0))
-                    {
-                        FlushResponse(false);
-                    }
-                }
-            }
+            byte[] fileBytes = new byte[(int)length];
+            int bytesRead = f.Read(fileBytes, 0, (int)length);
+            SendResponseFromMemory(fileBytes, bytesRead);
         }
 
         public override void FlushResponse(bool finalFlush)
