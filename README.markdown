@@ -24,14 +24,12 @@ Currently limitations
 ---------------------
 
 * Only works with x86 (x64 not supported).
-* Probably does not handle text encoding correctly.
 
 
 Areas for improvement
 ---------------------
 
  - See if the recieve socket also does not like multiple threads using it and added a recieve queue if needed.
- - Make the format parsing more correct by doing spliting while messages are still bytes instead of blindly turning all content into ASCII.
  - Complile a 64-bit version of the ZMQ native library and use it with clrzmq to allow for 64-bit handlers.
  - Make the Cassini port more correctly implement the overrides of SimpleWorkerRequest.
 

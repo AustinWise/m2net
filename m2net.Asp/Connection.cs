@@ -30,13 +30,12 @@ namespace Cassini
         Server _server;
         m2net.Request _mongrel2Request;
         private List<byte[]> _thingsToSend = new List<byte[]>();
-        private byte[] _reencodedBody;
+        private string _bodyAsAscii = null;
 
         internal Connection(Server server, m2net.Request mongrel2Request)
         {
             _server = server;
             _mongrel2Request = mongrel2Request;
-            _reencodedBody = Encoding.Default.GetBytes(mongrel2Request.Body);
         }
 
         public override object InitializeLifetimeService()
@@ -150,17 +149,19 @@ namespace Cassini
 
         public byte[] GetBody()
         {
-            return _reencodedBody;
+            return _mongrel2Request.Body;
         }
 
         public int GetBodySize()
         {
-            return _reencodedBody.Length;
+            return _mongrel2Request.Body.Length;
         }
 
         public string ReadRequestBody()
         {
-            return _mongrel2Request.Body;
+            if (_bodyAsAscii == null)
+                _bodyAsAscii = Encoding.ASCII.GetString(_mongrel2Request.Body);
+            return _bodyAsAscii;
         }
 
         public void Write100Continue()

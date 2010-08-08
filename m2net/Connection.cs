@@ -66,7 +66,7 @@ namespace m2net
             while (!this.reqs.Recv(out msg))
                 ;
 
-            return Request.Parse(Encoding.ASCII.GetString(msg));
+            return Request.Parse(msg);
         }
 
         public void Send(string uuid, string conn_id, byte[] msg)
