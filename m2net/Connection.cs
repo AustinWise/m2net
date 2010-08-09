@@ -77,7 +77,6 @@ namespace m2net
         public void Send(string uuid, string conn_id, byte[] msg, int offset, int length)
         {
             string header = string.Format("{0} {1}:{2}, ", uuid, conn_id.Length, conn_id);
-            Console.WriteLine("sending {0}", header);
             byte[] headerBytes = Enc.GetBytes(header);
             byte[] data = new byte[headerBytes.Length + length];
             Array.Copy(headerBytes, data, headerBytes.Length);
