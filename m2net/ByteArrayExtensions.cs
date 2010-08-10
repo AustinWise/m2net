@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 
 namespace m2net
@@ -20,25 +19,47 @@ namespace m2net
             return Encoding.ASCII.GetString(bytes);
         }
 
-        public static List<byte[]> Split(this byte[] msg, char separator, int count)
+        public static string ToAsciiString(this ArraySegment<byte> bytes)
         {
-            var ret = new List<byte[]>();
+            return Encoding.ASCII.GetString(bytes.Array, bytes.Offset, bytes.Count);
+        }
+
+        public static byte[] ToArray(this ArraySegment<byte> seg)
+        {
+            byte[] copy = new byte[seg.Count];
+            Buffer.BlockCopy(seg.Array, seg.Offset, copy, 0, seg.Count);
+            return copy;
+        }
+
+        private static byte Get(this ArraySegment<byte> seg, int index)
+        {
+            return seg.Array[seg.Offset + index];
+        }
+
+        public static List<ArraySegment<byte>> Split(this byte[] msg, char separator, int count)
+        {
+            return Split(new ArraySegment<byte>(msg), separator, count);
+        }
+
+        public static List<ArraySegment<byte>> Split(this ArraySegment<byte> msg, char separator, int count)
+        {
+            var ret = new List<ArraySegment<byte>>();
             int i = 0;
             for (int substringNdx = 1; substringNdx < count; substringNdx++)
             {
-                if (i == msg.Length)
+                if (i == msg.Count)
                     break;
 
                 int splitCount = 0;
-                while ((i + splitCount) < msg.Length && msg[i + splitCount] != (byte)separator)
+                while ((i + splitCount) < msg.Count && msg.Get(i + splitCount) != (byte)separator)
                     splitCount++;
 
                 ret.Add(copy(msg, i, splitCount));
                 i += splitCount + 1;
             }
 
-            if (i != msg.Length)
-                ret.Add(copy(msg, i, msg.Length - i));
+            if (i != msg.Count)
+                ret.Add(copy(msg, i, msg.Count - i));
 
             return ret;
         }
@@ -51,20 +72,28 @@ namespace m2net
         /// </remarks>
         /// <param name="msg"></param>
         /// <returns>index 0 is the netstring, index 1 is the rest</returns>
-        public static byte[][] ParseNetstring(this byte[] msg)
+        public static ArraySegment<byte>[] ParseNetstring(this ArraySegment<byte> msg)
         {
             var split = msg.Split(':', 2);
-            int len = int.Parse(Encoding.ASCII.GetString(split[0]));
-            if (split[1][len] != ',')
+            int len = int.Parse(split[0].ToAsciiString());
+            if (split[1].Get(len) != ',')
                 throw new FormatException("Netstring did not end in ','.");
-            return new byte[][] { copy(split[1], 0, len), copy(split[1], len + 1, split[1].Length - len - 1) };
+            return new ArraySegment<byte>[] { copy(split[1], 0, len), copy(split[1], len + 1, split[1].Count - len - 1) };
         }
 
-        private static byte[] copy(byte[] msg, int ndx, int count)
+        public static ArraySegment<byte>[] ParseNetstring(this byte[] msg)
         {
-            byte[] copy = new byte[count];
-            Buffer.BlockCopy(msg, ndx, copy, 0, count);
-            return copy;
+            return ParseNetstring(new ArraySegment<byte>(msg));
+        }
+
+        private static ArraySegment<byte> copy(ArraySegment<byte> msg, int ndx, int count)
+        {
+            return new ArraySegment<byte>(msg.Array, msg.Offset + ndx, count);
+        }
+
+        private static ArraySegment<byte> copy(byte[] msg, int ndx, int count)
+        {
+            return new ArraySegment<byte>(msg, ndx, count);
         }
     }
 }

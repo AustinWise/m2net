@@ -8,7 +8,7 @@ Mongrel2 examples.  It also comes with an even more rough port of the
 Dependencies
 ------------
 
- - .NET Framework 3.5 (though it probably could be easily changed to use 2.0)
+ - .NET Framework 3.5 (Can be compiled against the 2.0 BCL if you add add your own ExtensionAttribute)
  - [libzmq.dll](http://www.zeromq.org/) (included)
  - [clrzmq](http://github.com/zeromq/clrzmq/) (included)
  - [Jayrock.JSON](http://jayrock.berlios.de/) (included)

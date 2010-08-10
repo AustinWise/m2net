@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using Jayrock.Json;
 
@@ -19,7 +18,14 @@ namespace m2net
         {
             get
             {
-                return this.Headers["METHOD"] == "JSON" && this.Data.GetMembers().Where(m => m.Name == "type").First().Buffer.GetString() == "disconnect";
+                if (this.Headers["METHOD"] != "JSON")
+                    return false;
+                foreach (var m in Data.GetMembers())
+                {
+                    if (m.Name == "type" && m.Buffer.GetString() == "disconnect")
+                        return true;
+                }
+                return false;
             }
         }
 
@@ -55,7 +61,7 @@ namespace m2net
 
             var body = rest.ParseNetstring()[0];
 
-            return new Request(sender, conn_id, path, headers, body);
+            return new Request(sender, conn_id, path, headers, body.ToArray());
         }
     }
 }

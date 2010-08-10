@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.Threading;
 
@@ -114,17 +113,23 @@ namespace m2net
             this.Send(req.Sender, req.ConnId, msg);
         }
 
-        private const string HTTP_FORMAT = "HTTP/1.1 {0} {1}\r\n{2}\r\n\r\n";
+        private const string HTTP_FORMAT = "HTTP/1.1 {0} {1}\r\n{2}\r\n";
         private byte[] httpResponse(string body, int code, string status, Dictionary<string, string> headers)
         {
             var bodyBytes = Enc.GetBytes(body);
             headers["Content-Length"] = bodyBytes.Length.ToString();
-            var header = string.Format(HTTP_FORMAT, code, status, (headers.Select(kvp => kvp.Key + ": " + kvp.Value)).Aggregate((a, b) => a + "\r\n" + b));
+            var formattedHeaders = new StringBuilder();
+
+            foreach (var kvp in headers)
+            {
+                formattedHeaders.AppendFormat("{0}: {1}\r\n", kvp.Key, kvp.Value);
+            }
+
+            var header = string.Format(HTTP_FORMAT, code, status, formattedHeaders);
             var headerBytes = Enc.GetBytes(header);
             var ret = new byte[bodyBytes.Length + headerBytes.Length];
             Array.Copy(headerBytes, ret, headerBytes.Length);
             Array.Copy(bodyBytes, 0, ret, headerBytes.Length, bodyBytes.Length);
-            //headers["Content-Length"]'
             return ret;
         }
 

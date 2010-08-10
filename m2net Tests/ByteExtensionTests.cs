@@ -15,7 +15,7 @@ namespace m2net_Tests
         {
             var ns = "10:0123456789,things";
             var nsBytes = Encoding.ASCII.GetBytes(ns);
-            var parsed = nsBytes.ParseNetstring().Select(b => Encoding.ASCII.GetString(b)).ToArray();
+            var parsed = nsBytes.ParseNetstring().Select(b => b.ToAsciiString()).ToArray();
             Assert.AreEqual("0123456789", parsed[0]);
             Assert.AreEqual("things", parsed[1]);
         }
@@ -31,7 +31,7 @@ namespace m2net_Tests
         private void testSplit(string str, int count)
         {
             var stringSplit = str.Split(new char[] { ' ' }, count);
-            var byteSplit = Encoding.ASCII.GetBytes(str).Split(' ', count).Select(b => Encoding.ASCII.GetString(b)).ToList();
+            var byteSplit = Encoding.ASCII.GetBytes(str).Split(' ', count).Select(b => b.ToAsciiString()).ToList();
 
             Assert.AreEqual(stringSplit.Length, byteSplit.Count, "splits did not produce lists of the same length");
 
