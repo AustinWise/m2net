@@ -7,11 +7,6 @@ namespace m2net
     /// <summary>
     /// Replacements for string functions that operate on bytes instead chars.
     /// </summary>
-    /// <remarks>
-    /// Currently these functions are implemented using copying.  Idealy these
-    /// would be implemented using a method that avoids copying.  But this
-    /// is easier for now.
-    /// </remarks>
     public static class ByteArrayExtensions
     {
         public static string ToAsciiString(this byte[] bytes)

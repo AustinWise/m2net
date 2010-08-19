@@ -1,9 +1,8 @@
 m2net, a .NET library to develop [Mongrel2] handlers
 -----------------------------------------------------------------
 
-[m2net] is a pretty rough port of the python handler libraries included in the
-Mongrel2 examples.  It also comes with an even more rough port of the
-[Cassini] web server to use m2net instead of sockets.
+[m2net] helps you develop Mongrel2 handlers. It also comes with a rough port of the
+[Cassini] ASP.NET web server to use m2net instead of sockets.
 
 Dependencies
 ------------
@@ -17,26 +16,27 @@ Dependencies
 License
 -------
 
-m2net is licensed under the [LGPL] because clrzmq and Jayrock are.  m2net.asp is licensed under the [Microsoft Public License].
+m2net is licensed under the BSD license.  m2net.asp is licensed under the [Microsoft Public License], since it is derived from Cassini.
 
 
 Currently limitations
 ---------------------
 
-* Only works with x86 (x64 not supported).
+* You have to manually compile it on Linux (but it does work).
+* Only works with x86 .NET apps on Windows.  That is, it will run just fine
+  under x64 Windows just as long as you compile it as X86 and not AnyCPU or x64.
 
 
 Areas for improvement
 ---------------------
 
+ - Needs a NANT script or make file for linux.
  - See if the recieve socket also does not like multiple threads using it and added a recieve queue if needed.
- - Complile a 64-bit version of the ZMQ native library and use it with clrzmq to allow for 64-bit handlers.
+ - Complile a 64-bit version of the ZMQ native library and use it with clrzmq to allow for 64-bit handlers on Windows.
  - Make the Cassini port more correctly implement the overrides of SimpleWorkerRequest.
-
 
 
   [m2net]: http://github.com/AustinWise/m2net/
   [Cassini]:http://blogs.msdn.com/b/dmitryr/archive/2008/10/03/cassini-for-framework-3-5.aspx
   [Mongrel2]:http://mongrel2.org/
-  [LGPL]:http://www.gnu.org/licenses/lgpl.html
   [Microsoft Public License]:http://www.opensource.org/licenses/ms-pl.html
