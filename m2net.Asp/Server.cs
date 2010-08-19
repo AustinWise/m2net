@@ -99,7 +99,6 @@ namespace Cassini
                     try
                     {
                         m2net.Request acceptedSocket = _mongrel2Connection.Receive();
-                        Console.WriteLine("got");
 
                         ThreadPool.QueueUserWorkItem(delegate
                         {

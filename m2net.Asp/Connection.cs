@@ -29,7 +29,6 @@ namespace Cassini
     {
         Server _server;
         m2net.Request _mongrel2Request;
-        private List<byte[]> _thingsToSend = new List<byte[]>();
         private string _bodyAsAscii = null;
 
         internal Connection(Server server, m2net.Request mongrel2Request)
@@ -48,16 +47,6 @@ namespace Cassini
 
         public void Close()
         {
-            int totalLength = (from d in _thingsToSend select d.Length).Aggregate((a, b) => a + b);
-            byte[] data = new byte[totalLength];
-            int bytesCopied = 0;
-            foreach (var bytes in _thingsToSend)
-            {
-                Buffer.BlockCopy(bytes, 0, data, bytesCopied, bytes.Length);
-                bytesCopied += bytes.Length;
-            }
-
-            _server.Mongrel2Connection.Reply(_mongrel2Request, data);
             _mongrel2Request = null;
         }
 
@@ -171,9 +160,7 @@ namespace Cassini
 
         public void WriteBody(byte[] data, int offset, int length)
         {
-            byte[] copy = new byte[length];
-            Buffer.BlockCopy(data, offset, copy, 0, length);
-            this._thingsToSend.Add(copy);
+            _server.Mongrel2Connection.Reply(_mongrel2Request, data, offset, length);
         }
 
         public void WriteEntireResponseFromString(int statusCode, String extraHeaders, String body, bool keepAlive)
@@ -183,7 +170,7 @@ namespace Cassini
                 int bodyLength = (body != null) ? Encoding.UTF8.GetByteCount(body) : 0;
                 string headers = MakeResponseHeaders(statusCode, extraHeaders, bodyLength, keepAlive);
 
-                _thingsToSend.Add(Encoding.UTF8.GetBytes(headers + body));
+                _server.Mongrel2Connection.Reply(_mongrel2Request, Encoding.UTF8.GetBytes(headers + body));
             }
             catch (SocketException)
             {
@@ -226,11 +213,8 @@ namespace Cassini
                 String headers = MakeResponseHeaders(200, contentTypeHeader, bytesRead, keepAlive);
                 byte[] headerBytes = Encoding.ASCII.GetBytes(headers);
 
-                byte[] data = new byte[headerBytes.Length + len];
-                Array.Copy(headerBytes, data, headerBytes.Length);
-                Array.Copy(fileBytes, 0, data, headerBytes.Length, len);
-
-                _thingsToSend.Add(data);
+                _server.Mongrel2Connection.Reply(_mongrel2Request, headerBytes);
+                _server.Mongrel2Connection.Reply(_mongrel2Request, fileBytes);
 
                 completed = true;
             }
@@ -261,7 +245,7 @@ namespace Cassini
         {
             string headers = MakeResponseHeaders(statusCode, extraHeaders, -1, false);
 
-            _thingsToSend.Add(Encoding.ASCII.GetBytes(headers));
+            _server.Mongrel2Connection.Reply(_mongrel2Request, Encoding.ASCII.GetBytes(headers));
         }
     }
 }
