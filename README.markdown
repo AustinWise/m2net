@@ -22,7 +22,6 @@ m2net is licensed under the BSD license.  m2net.asp is licensed under the [Micro
 Currently limitations
 ---------------------
 
-* You have to manually compile it on Linux (but it does work).
 * Only works with x86 .NET apps on Windows.  That is, it will run just fine
   under x64 Windows just as long as you compile it as X86 and not AnyCPU or x64.
 
@@ -30,7 +29,7 @@ Currently limitations
 Areas for improvement
 ---------------------
 
- - Needs a NANT script or make file for linux.
+ - A better Linux build experiance, perhaps such that the Linux build can be based on the VS solution and project files.
  - See if the recieve socket also does not like multiple threads using it and added a recieve queue if needed.
  - Complile a 64-bit version of the ZMQ native library and use it with clrzmq to allow for 64-bit handlers on Windows.
  - Make the Cassini port more correctly implement the overrides of SimpleWorkerRequest.
