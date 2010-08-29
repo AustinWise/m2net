@@ -10,21 +10,9 @@ namespace m2net.HandlerTest
     {
         static void Main(string[] args)
         {
-            string vboxIp = "10.5.2.206";
+            string vboxIp = "10.5.2.202";
             var conn = new Connection("54c6755b-9628-40a4-9a2d-cc82a816345e", "tcp://" + vboxIp + ":9997", "tcp://" + vboxIp + ":9996");
-            AspNetTest(conn);
-        }
-
-        static void AspNetTest(Connection conn)
-        {
-            var srv = new Cassini.Server(conn, "/handlertest/", @"D:\Down\asp\");
-
-            srv.Start();
-
-            Console.WriteLine("press enter to exit");
-            Console.ReadLine();
-
-            srv.Stop();
+            HandlerTest(conn);
         }
 
         static void HandlerTest(Connection conn)
