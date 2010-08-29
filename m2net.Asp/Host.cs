@@ -36,8 +36,8 @@ namespace Cassini
         string _lowerCasedVirtualPathWithTrailingSlash;
         string _physicalPath;
         string _installPath;
-        string _physicalClientScriptPath;
-        string _lowerCasedClientScriptPathWithTrailingSlash;
+        string _physicalClientScriptPath = null;
+        string _lowerCasedClientScriptPathWithTrailingSlash = null;
 
         public override object InitializeLifetimeService()
         {
@@ -61,8 +61,10 @@ namespace Cassini
             _lowerCasedVirtualPathWithTrailingSlash = virtualPath.EndsWith("/", StringComparison.Ordinal) ? virtualPath : virtualPath + "/";
             _lowerCasedVirtualPathWithTrailingSlash = CultureInfo.InvariantCulture.TextInfo.ToLower(_lowerCasedVirtualPathWithTrailingSlash);
             _physicalPath = physicalPath;
+#if !MONO
             _physicalClientScriptPath = HttpRuntime.AspClientScriptPhysicalPath + "\\";
             _lowerCasedClientScriptPathWithTrailingSlash = CultureInfo.InvariantCulture.TextInfo.ToLower(HttpRuntime.AspClientScriptVirtualPath + "/");
+#endif
         }
 
         public void ProcessRequest(Connection conn)
@@ -126,11 +128,31 @@ namespace Cassini
         }
 
         public string InstallPath { get { return _installPath; } }
-        public string NormalizedClientScriptPath { get { return _lowerCasedClientScriptPathWithTrailingSlash; } }
         public string NormalizedVirtualPath { get { return _lowerCasedVirtualPathWithTrailingSlash; } }
-        public string PhysicalClientScriptPath { get { return _physicalClientScriptPath; } }
         public string PhysicalPath { get { return _physicalPath; } }
         public string VirtualPath { get { return _virtualPath; } }
+
+        //These two properties are only called when isClientScriptPath is true,
+        //so something is really screwed up if they ever get called on Mono.
+        public string NormalizedClientScriptPath
+        {
+            get
+            {
+                if (_lowerCasedClientScriptPathWithTrailingSlash == null)
+                    throw new NotSupportedException("Mono does not support HttpRuntime.AspClientScriptVirtualPath.");
+                return _lowerCasedClientScriptPathWithTrailingSlash;
+            }
+        }
+        public string PhysicalClientScriptPath
+        {
+            get
+            {
+                if (_physicalClientScriptPath == null)
+                    throw new NotSupportedException("Mono does not support HttpRuntime.AspClientScriptPhysicalPath.");
+                return _physicalClientScriptPath;
+            }
+        }
+
 
         public bool IsVirtualPathInApp(String path)
         {
@@ -149,7 +171,8 @@ namespace Cassini
 
             if (_virtualPath == "/" && path.StartsWith("/", StringComparison.Ordinal))
             {
-                if (path.StartsWith(_lowerCasedClientScriptPathWithTrailingSlash, StringComparison.Ordinal))
+                if (_lowerCasedClientScriptPathWithTrailingSlash != null
+                    && path.StartsWith(_lowerCasedClientScriptPathWithTrailingSlash, StringComparison.Ordinal))
                     isClientScriptPath = true;
                 return true;
             }
@@ -162,7 +185,8 @@ namespace Cassini
             if (path == _lowerCasedVirtualPath)
                 return true;
 
-            if (path.StartsWith(_lowerCasedClientScriptPathWithTrailingSlash, StringComparison.Ordinal))
+            if (_lowerCasedClientScriptPathWithTrailingSlash != null
+                && path.StartsWith(_lowerCasedClientScriptPathWithTrailingSlash, StringComparison.Ordinal))
             {
                 isClientScriptPath = true;
                 return true;
