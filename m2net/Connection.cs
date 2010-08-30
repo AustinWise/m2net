@@ -145,6 +145,7 @@ namespace m2net
             itemsReadyToSend.Set();
             reqs.Dispose();
             resp.Dispose();
+            CTX.Dispose();
         }
     }
 }
