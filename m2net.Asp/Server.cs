@@ -22,6 +22,7 @@ using System.Runtime.Remoting;
 using System.Threading;
 using System.Web;
 using System.Web.Hosting;
+using System.Web.Compilation;
 
 namespace Cassini
 {
@@ -213,26 +214,9 @@ namespace Cassini
 
         static object CreateWorkerAppDomainWithHost(string virtualPath, string physicalPath, Type hostType)
         {
-            // this creates worker app domain in a way that host doesn't need to be in GAC or bin
-            // using BuildManagerHost via private reflection
-            string uniqueAppString = string.Concat(virtualPath, physicalPath).ToLowerInvariant();
-            string appId = (uniqueAppString.GetHashCode()).ToString("x", CultureInfo.InvariantCulture);
+            var buildManager = new ClientBuildManager(virtualPath, physicalPath);
 
-            // create BuildManagerHost in the worker app domain
-            var appManager = ApplicationManager.GetApplicationManager();
-            var buildManagerHostType = typeof(HttpRuntime).Assembly.GetType("System.Web.Compilation.BuildManagerHost");
-            var buildManagerHost = appManager.CreateObject(appId, buildManagerHostType, virtualPath, physicalPath, false);
-
-            // call BuildManagerHost.RegisterAssembly to make Host type loadable in the worker app domain
-            buildManagerHostType.InvokeMember(
-                "RegisterAssembly",
-                BindingFlags.Instance | BindingFlags.InvokeMethod | BindingFlags.NonPublic,
-                null,
-                buildManagerHost,
-                new object[2] { hostType.Assembly.FullName, hostType.Assembly.Location });
-
-            // create Host in the worker app domain
-            return appManager.CreateObject(appId, hostType, virtualPath, physicalPath, false);
+            return buildManager.CreateObject(hostType, false);            
         }
     }
 }
