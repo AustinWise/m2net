@@ -214,9 +214,47 @@ namespace Cassini
 
         static object CreateWorkerAppDomainWithHost(string virtualPath, string physicalPath, Type hostType)
         {
-            var buildManager = new ClientBuildManager(virtualPath, physicalPath);
+            // this creates worker app domain in a way that host doesn't need to be in GAC or bin
+            // using BuildManagerHost via private reflection
+            string uniqueAppString = string.Concat(virtualPath, physicalPath).ToLowerInvariant();
+            string appId = (uniqueAppString.GetHashCode()).ToString("x", CultureInfo.InvariantCulture);
 
-            return buildManager.CreateObject(hostType, false);            
+            // create BuildManagerHost in the worker app domain
+            var appManager = ApplicationManager.GetApplicationManager();
+
+            // call BuildManagerHost.RegisterAssembly to make Host type loadable in the worker app domain
+            var buildManagerHostType = typeof(HttpRuntime).Assembly.GetType("System.Web.Compilation.BuildManagerHost");
+            if (buildManagerHostType != null)
+            {
+                //on the Microsoft .NET framework we can make sure the DLL is loaded into the ASP.NET AppDomain by
+                //using this internal path.  A nice solution does not exist for Mono (as far as I can tell), so this
+                //DLL will just need to be in the probing path or in the GAC.
+
+                var buildManagerHost = appManager.CreateObject(appId, buildManagerHostType, virtualPath, physicalPath, false);
+
+                buildManagerHostType.InvokeMember(
+                    "RegisterAssembly",
+                    BindingFlags.Instance | BindingFlags.InvokeMethod | BindingFlags.NonPublic,
+                    null,
+                    buildManagerHost,
+                    new object[2] { hostType.Assembly.FullName, hostType.Assembly.Location });
+            }
+
+            // create Host in the worker app domain
+            try
+            {
+                return appManager.CreateObject(appId, hostType, virtualPath, physicalPath, false);
+            }
+            catch (TypeLoadException ex)
+            {
+                Console.WriteLine(ex);
+                Console.WriteLine();
+                Console.WriteLine("Failed to create host type.");
+                Console.WriteLine("m2net.AspNetHandler.dll needs to either be put into the GAC or the directory containing it has to be put on");
+                Console.WriteLine("web app's probing path via its web.config file.  See:");
+                Console.WriteLine("http://msdn.microsoft.com/en-us/library/823z9h8w%28VS.80%29.aspx");
+                return null;
+            }
         }
     }
 }
