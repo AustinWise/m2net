@@ -8,7 +8,7 @@ namespace m2net
     public class Connection : MarshalByRefObject, IDisposable
     {
         private ZMQ.Context CTX;
-        public const int IoThreads = 20;
+        public const int IoThreads = 5;
         private Encoding Enc = Encoding.ASCII;
 
         private ZMQ.Socket reqs;
@@ -27,7 +27,7 @@ namespace m2net
 
             this.SenderId = sender_id;
 
-            reqs = CTX.Socket(ZMQ.UPSTREAM);
+            reqs = CTX.Socket(ZMQ.PULL);
             reqs.Connect(sub_addr);
 
             this.sub_addr = sub_addr;
