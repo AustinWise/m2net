@@ -245,7 +245,7 @@ namespace Cassini
             {
                 return appManager.CreateObject(appId, hostType, virtualPath, physicalPath, false);
             }
-            catch (TypeLoadException ex)
+            catch (FileNotFoundException ex)
             {
                 Console.WriteLine(ex);
                 Console.WriteLine();
