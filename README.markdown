@@ -29,7 +29,9 @@ Currently limitations
 Areas for improvement
 ---------------------
 
+ - Inject m2net.Asp.dll into ASP.NET on Mono so that it does not have to be in the GAC.
  - A better Linux build experiance, perhaps such that the Linux build can be based on the VS solution and project files.
+ - Document how to use m2net and the ASP.NET handler.
  - See if the recieve socket also does not like multiple threads using it and added a recieve queue if needed.
  - Complile a 64-bit version of the ZMQ native library and use it with clrzmq to allow for 64-bit handlers on Windows.
  - Make the Cassini port more correctly implement the overrides of SimpleWorkerRequest.
