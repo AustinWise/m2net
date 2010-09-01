@@ -252,7 +252,7 @@ namespace Cassini
                 Console.WriteLine("Failed to create host type.");
                 Console.WriteLine("m2net.AspNetHandler.dll needs to either be put into the GAC or the directory containing it has to be put on");
                 Console.WriteLine("web app's probing path via its web.config file.  See:");
-                Console.WriteLine("http://msdn.microsoft.com/en-us/library/823z9h8w%28VS.80%29.aspx");
+                Console.WriteLine("http://msdn.microsoft.com/en-us/library/823z9h8w(VS.80).aspx");
                 return null;
             }
         }
