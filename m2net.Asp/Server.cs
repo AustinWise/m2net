@@ -46,7 +46,7 @@ namespace Cassini
         {
             _mongrel2Connection = mongrel2Connection;
             _virtualPath = virtualPath;
-            _physicalPath = physicalPath.EndsWith("\\", StringComparison.Ordinal) ? physicalPath : physicalPath + "\\";
+            _physicalPath = physicalPath[physicalPath.Length - 1] == Path.DirectorySeparatorChar ? physicalPath : physicalPath + Path.DirectorySeparatorChar;
         }
 
         public override object InitializeLifetimeService()

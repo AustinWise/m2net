@@ -710,9 +710,9 @@ namespace Cassini
                 }
             }
 
-            mappedPath = mappedPath.Replace('/', '\\');
+            mappedPath = mappedPath.Replace('/', Path.DirectorySeparatorChar);
 
-            if (mappedPath.EndsWith("\\", StringComparison.Ordinal) && !mappedPath.EndsWith(":\\", StringComparison.Ordinal))
+            if (mappedPath.Length > 0 && mappedPath[mappedPath.Length - 1] == Path.DirectorySeparatorChar && !mappedPath.EndsWith(":" + Path.DirectorySeparatorChar, StringComparison.Ordinal))
             {
                 mappedPath = mappedPath.Substring(0, mappedPath.Length - 1);
             }
