@@ -29,16 +29,12 @@ namespace m2net
             }
         }
 
-        internal Request(string sender, string conn_id, string path, string headers, byte[] body)
+        internal Request(string sender, string conn_id, string path, Dictionary<string, string> headers, byte[] body)
         {
             this.Sender = sender;
             this.ConnId = conn_id;
             this.Path = path;
-            this.Headers = new Dictionary<string, string>();
-            foreach (var h in JsonBuffer.From(headers).GetMembers())
-            {
-                this.Headers.Add(h.Name, h.Buffer.GetString());
-            }
+            this.Headers = headers;
             this.Body = body;
 
             if (this.Headers["METHOD"] == "JSON")
@@ -55,13 +51,70 @@ namespace m2net
             var path = threeChunks[2].ToAsciiString();
             var rest = threeChunks[3];
 
-            var headersAndRest = rest.ParseNetstring();
-            var headers = headersAndRest[0].ToAsciiString();
-            rest = headersAndRest[1];
+            var headersAndRest = rest.TParse();
+            var headers = headersAndRest.Data;
+            rest = headersAndRest.Remain;
 
             var body = rest.ParseNetstring()[0];
 
-            return new Request(sender, conn_id, path, headers, body.ToArray());
+            var headersDic = headers is ArraySegment<byte> ? ParseJsonHeaders(headers) : ParseTnsHeaders(headers);
+
+            return new Request(sender, conn_id, path, headersDic, body.ToArray());
+        }
+
+        private static Dictionary<string, string> ParseJsonHeaders(object data)
+        {
+            var headers = new Dictionary<string, string>();
+            foreach (var h in JsonBuffer.From(((ArraySegment<byte>)data).ToAsciiString()).GetMembers())
+            {
+                var key = h.Name;
+                if (h.Buffer.IsScalar)
+                    headers.Add(key, h.Buffer.GetString());
+                else if (h.Buffer.IsArray)
+                {
+                    for (int i = 1; i < h.Buffer.GetArrayLength(); i++)
+                    {
+                        var v = h.Buffer[i];
+                        if (v.Class != JsonTokenClass.String)
+                            throw new Exception("non-string value header");
+                        if (headers.ContainsKey(key))
+                            break; //TODO: support many header values
+                        headers.Add(key, v.Text);
+                    }
+                }
+                else
+                {
+                    throw new Exception("Unexpected JSON type.");
+                }
+            }
+            return headers;
+        }
+
+        private static Dictionary<string, string> ParseTnsHeaders(object data)
+        {
+            var objDic = data as Dictionary<object, object>;
+            var ret = new Dictionary<string, string>();
+
+            foreach (var kvp in objDic)
+            {
+                var key = ((ArraySegment<byte>)kvp.Key).ToAsciiString();
+                if (kvp.Value is ArraySegment<byte>)
+                {
+                    var value = (ArraySegment<byte>)kvp.Value;
+                    ret.Add(key, value.ToAsciiString());
+                }
+                else
+                {
+                    foreach (ArraySegment<byte> value in (List<object>)kvp.Value)
+                    {
+                        if (ret.ContainsKey(key))
+                            break; //TODO: many headers
+                        ret.Add(key, value.ToAsciiString());
+                    }
+                }
+            }
+
+            return ret;
         }
     }
 }

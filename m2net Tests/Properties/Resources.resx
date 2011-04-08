@@ -117,6 +117,10 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
+  <data name="request_payloads" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\request_payloads.txt;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;Windows-1252</value>
+  </data>
   <data name="SampleRequestWithNoBody" xml:space="preserve">
     <value>54c6755b-9628-40a4-9a2d-cc82a816345e 19 /handlertest 514:{"PATH":"/handlertest","METHOD":"GET","VERSION":"HTTP/1.1","URI":"/handlertest","PATTERN":"/handlertest","Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8","Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7","Accept-Encoding":"gzip,deflate","Accept-Language":"en-us,en;q=0.5","Cache-Control":"max-age=0","Connection":"keep-alive","Host":"localhost:6767","Keep-Alive":"115","User-Agent":"Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.2.6) Gecko/20100628 Ubuntu/10.04 (lucid) Firefox/3.6.6"},0:,</value>
   </data>

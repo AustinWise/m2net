@@ -25,5 +25,16 @@ namespace m2net_Tests
         {
             return Encoding.ASCII.GetBytes(str);
         }
+
+        [TestMethod]
+        public void ParsePayloads()
+        {
+            foreach (var line in Properties.Resources.request_payloads.Split(Environment.NewLine.ToCharArray(), StringSplitOptions.RemoveEmptyEntries))
+            {
+                var bytes = Encoding.ASCII.GetBytes(line);
+                var req = Request.Parse(bytes);
+                Assert.IsNotNull(req.Headers["METHOD"]);
+            }
+        }
     }
 }

@@ -9,6 +9,21 @@ namespace m2net
     /// </summary>
     public static class ByteArrayExtensions
     {
+        public static ArraySegment<T> Substring<T>(this ArraySegment<T> data, int startIndex)
+        {
+            return new ArraySegment<T>(data.Array, data.Offset + startIndex, data.Count - startIndex);
+        }
+
+        public static ArraySegment<T> Substring<T>(this ArraySegment<T> data, int startIndex, int length)
+        {
+            return new ArraySegment<T>(data.Array, data.Offset + startIndex, length);
+        }
+
+        public static ArraySegment<T> Substring<T>(T[] data, int startIndex, int length)
+        {
+            return new ArraySegment<T>(data, startIndex, length);
+        }
+
         public static string ToAsciiString(this byte[] bytes)
         {
             return Encoding.ASCII.GetString(bytes);
@@ -26,7 +41,7 @@ namespace m2net
             return copy;
         }
 
-        private static byte Get(this ArraySegment<byte> seg, int index)
+        public static byte Get(this ArraySegment<byte> seg, int index)
         {
             return seg.Array[seg.Offset + index];
         }
@@ -49,12 +64,12 @@ namespace m2net
                 while ((i + splitCount) < msg.Count && msg.Get(i + splitCount) != (byte)separator)
                     splitCount++;
 
-                ret.Add(copy(msg, i, splitCount));
+                ret.Add(Substring(msg, i, splitCount));
                 i += splitCount + 1;
             }
 
             if (i != msg.Count)
-                ret.Add(copy(msg, i, msg.Count - i));
+                ret.Add(Substring(msg, i, msg.Count - i));
 
             return ret;
         }
@@ -73,22 +88,12 @@ namespace m2net
             int len = int.Parse(split[0].ToAsciiString());
             if (split[1].Get(len) != ',')
                 throw new FormatException("Netstring did not end in ','.");
-            return new ArraySegment<byte>[] { copy(split[1], 0, len), copy(split[1], len + 1, split[1].Count - len - 1) };
+            return new ArraySegment<byte>[] { Substring(split[1], 0, len), Substring(split[1], len + 1, split[1].Count - len - 1) };
         }
 
         public static ArraySegment<byte>[] ParseNetstring(this byte[] msg)
         {
             return ParseNetstring(new ArraySegment<byte>(msg));
-        }
-
-        private static ArraySegment<byte> copy(ArraySegment<byte> msg, int ndx, int count)
-        {
-            return new ArraySegment<byte>(msg.Array, msg.Offset + ndx, count);
-        }
-
-        private static ArraySegment<byte> copy(byte[] msg, int ndx, int count)
-        {
-            return new ArraySegment<byte>(msg, ndx, count);
         }
     }
 }

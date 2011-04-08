@@ -61,6 +61,19 @@ namespace m2net_Tests.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to FAKESENDER 0 / 76:{&quot;PATH&quot;:&quot;/&quot;,&quot;host&quot;:&quot;default&quot;,&quot;METHOD&quot;:&quot;HEAD&quot;,&quot;VERSION&quot;:&quot;HTTP/1.1&quot;,&quot;URI&quot;:&quot;/&quot;},0:,
+        ///FAKESENDER 0 / 75:6:METHOD,4:HEAD,3:URI,1:/,7:VERSION,8:HTTP/1.1,4:PATH,1:/,4:host,7:default,}0:,
+        ///FAKESENDER 0 / 99:{&quot;PATH&quot;:&quot;/&quot;,&quot;accept-encoding&quot;:&quot;foo&quot;,&quot;host&quot;:&quot;default&quot;,&quot;METHOD&quot;:&quot;GET&quot;,&quot;VERSION&quot;:&quot;HTTP/1.1&quot;,&quot;URI&quot;:&quot;/&quot;},0:,
+        ///FAKESENDER 0 / 99:6:METHOD,3:GET,3:URI,1:/,7:VERSION,8:HTTP/1.1,4:PATH,1:/,4:host,7:default,15:accept-encoding,3:foo,}0:,
+        ///FAKESENDER 0 /virt/tst_11/r503 125:{&quot;PATH&quot;:&quot;/virt/tst_11/r503&quot;,&quot;acc [rest of string was truncated]&quot;;.
+        /// </summary>
+        internal static string request_payloads {
+            get {
+                return ResourceManager.GetString("request_payloads", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to 54c6755b-9628-40a4-9a2d-cc82a816345e 19 /handlertest 514:{&quot;PATH&quot;:&quot;/handlertest&quot;,&quot;METHOD&quot;:&quot;GET&quot;,&quot;VERSION&quot;:&quot;HTTP/1.1&quot;,&quot;URI&quot;:&quot;/handlertest&quot;,&quot;PATTERN&quot;:&quot;/handlertest&quot;,&quot;Accept&quot;:&quot;text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8&quot;,&quot;Accept-Charset&quot;:&quot;ISO-8859-1,utf-8;q=0.7,*;q=0.7&quot;,&quot;Accept-Encoding&quot;:&quot;gzip,deflate&quot;,&quot;Accept-Language&quot;:&quot;en-us,en;q=0.5&quot;,&quot;Cache-Control&quot;:&quot;max-age=0&quot;,&quot;Connection&quot;:&quot;keep-alive&quot;,&quot;Host&quot;:&quot;localhost:6767&quot;,&quot;Keep-Alive&quot;:&quot;115&quot;,&quot;User-Agent&quot;:&quot;Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1 [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string SampleRequestWithNoBody {
