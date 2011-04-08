@@ -8,27 +8,29 @@ namespace m2net
     public class Connection : MarshalByRefObject, IDisposable
     {
         private ZMQ.Context CTX;
-        public const int IoThreads = 5;
+        public const int IoThreads = 1;
         private Encoding Enc = Encoding.ASCII;
 
-        private ZMQ.Socket reqs;
-        private ZMQ.Socket resp;
         private string sub_addr;
         private string pub_addr;
         public string SenderId { get; private set; }
         private bool isRunning = true;
+
         private AutoResetEvent itemsReadyToSend = new AutoResetEvent(false);
         private Thread sendThread;
         private Queue<byte[]> sendQ = new Queue<byte[]>();
+
+        private AutoResetEvent itemsReadyToRecv = new AutoResetEvent(false);
+        private Thread recvThread;
+        private Queue<byte[]> recvQ = new Queue<byte[]>();
+
+        private int threadStillRunning = 2;
 
         public Connection(string sender_id, string sub_addr, string pub_addr)
         {
             CTX = new ZMQ.Context(IoThreads);
 
             this.SenderId = sender_id;
-
-            reqs = CTX.Socket(ZMQ.PULL);
-            reqs.Connect(sub_addr);
 
             this.sub_addr = sub_addr;
             this.pub_addr = pub_addr;
@@ -37,10 +39,17 @@ namespace m2net
             sendThread.Name = "Mongrel2 Connection send thread";
             sendThread.IsBackground = true;
             sendThread.Start();
+
+            recvThread = new Thread(recvProc);
+            recvThread.Name = "Mongrel2 Connection receive thread";
+            recvThread.IsBackground = true;
+            recvThread.Start();
         }
 
         private void sendProc()
         {
+            ZMQ.Socket resp;
+
             resp = CTX.Socket(ZMQ.PUB);
             resp.Connect(pub_addr);
             resp.SetSockOpt(ZMQ.IDENTITY, SenderId);
@@ -52,20 +61,77 @@ namespace m2net
                 {
                     while (sendQ.Count != 0)
                     {
-                        this.resp.Send(sendQ.Dequeue());
+                        byte[] stuffToSend = sendQ.Dequeue();
+                        while (!resp.Send(stuffToSend))
+                            ;
                     }
                 }
             }
+
+            resp.Dispose();
             itemsReadyToSend.Close();
+            Interlocked.Decrement(ref threadStillRunning);
+        }
+
+        private void recvProc()
+        {
+            ZMQ.Socket reqs;
+
+            if (!isRunning)
+                throw new ObjectDisposedException("Connection");
+
+            reqs = CTX.Socket(ZMQ.PULL);
+            reqs.Connect(sub_addr);
+
+            while (isRunning)
+            {
+                byte[] data;
+                bool gotIt = reqs.Recv(out data, ZMQ.NOBLOCK);
+
+                if (gotIt)
+                {
+                    lock (recvQ)
+                    {
+                        recvQ.Enqueue(data);
+                    }
+                    itemsReadyToRecv.Set();
+                }
+                else
+                {
+                    Thread.Sleep(1);
+                }
+            }
+
+            reqs.Dispose();
+            itemsReadyToRecv.Close();
+            Interlocked.Decrement(ref threadStillRunning);
         }
 
         public Request Receive()
         {
-            byte[] msg;
-            while (!this.reqs.Recv(out msg))
-                ;
 
-            return Request.Parse(msg);
+            byte[] data = null;
+
+            while (data == null)
+            {
+                if (!isRunning)
+                    throw new ObjectDisposedException("Connection");
+
+                if (recvQ.Count != 0)
+                {
+                    lock (recvQ)
+                    {
+                        if (recvQ.Count != 0)
+                            data = recvQ.Dequeue();
+                    }
+                }
+                else
+                {
+                    itemsReadyToRecv.WaitOne(1);
+                }
+            }
+
+            return Request.Parse(data);
         }
 
         public void Send(string uuid, string conn_id, byte[] msg)
@@ -75,6 +141,9 @@ namespace m2net
 
         public void Send(string uuid, string conn_id, byte[] msg, int offset, int length)
         {
+            if (!isRunning)
+                throw new ObjectDisposedException("Connection");
+
             string header = string.Format("{0} {1}:{2}, ", uuid, conn_id.Length, conn_id);
             byte[] headerBytes = Enc.GetBytes(header);
             byte[] data = new byte[headerBytes.Length + length];
@@ -142,9 +211,12 @@ namespace m2net
         public void Dispose()
         {
             isRunning = false;
-            itemsReadyToSend.Set();
-            reqs.Dispose();
-            resp.Dispose();
+            itemsReadyToSend.Set(); // wake up the send thread
+
+            //wait till the threads have closed their sockets before closing the context
+            while (threadStillRunning != 0)
+                Thread.Sleep(1);
+
             CTX.Dispose();
         }
     }
