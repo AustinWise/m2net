@@ -92,12 +92,12 @@ namespace m2net
 
         private static Dictionary<string, string> ParseTnsHeaders(object data)
         {
-            var objDic = data as Dictionary<object, object>;
+            var objDic = data as Dictionary<string, object>;
             var ret = new Dictionary<string, string>();
 
             foreach (var kvp in objDic)
             {
-                var key = ((ArraySegment<byte>)kvp.Key).ToAsciiString();
+                var key = kvp.Key;
                 if (kvp.Value is ArraySegment<byte>)
                 {
                     var value = (ArraySegment<byte>)kvp.Value;

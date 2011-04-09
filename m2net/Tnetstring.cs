@@ -119,7 +119,7 @@ namespace m2net
 
         private struct TPair
         {
-            public object Key;
+            public string Key;
             public object Value;
             public ArraySegment<byte> Extra;
         }
@@ -128,7 +128,10 @@ namespace m2net
         {
             var parsed = data.TParse();
 
-            var key = parsed.Data;
+            if (!(parsed.Data is ArraySegment<byte>))
+                throw new Exception("Dictionary key must be a string.");
+
+            var key = ((ArraySegment<byte>)parsed.Data).ToAsciiString();
             var extra = parsed.Remain;
 
             if (extra.Count == 0)
@@ -144,9 +147,9 @@ namespace m2net
             return new TPair() { Key = key, Value = val, Extra = extra };
         }
 
-        static Dictionary<object, object> ParseDict(ArraySegment<byte> data)
+        static Dictionary<string, object> ParseDict(ArraySegment<byte> data)
         {
-            var ret = new Dictionary<object, object>();
+            var ret = new Dictionary<string, object>();
 
             while (data.Count != 0)
             {
