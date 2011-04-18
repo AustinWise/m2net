@@ -5,6 +5,56 @@ using System.Text;
 
 namespace m2net
 {
+    public enum TnetStringType
+    {
+        Int,
+        Dict,
+        List,
+        Bool,
+        Null,
+        String
+    }
+
+    public class TnetString
+    {
+        public TnetString(int data)
+        {
+            this.IntValue = data;
+            this.Type = TnetStringType.Int;
+        }
+        public TnetString(Dictionary<string, TnetString> data)
+        {
+            this.DictValue = data;
+            this.Type = TnetStringType.Dict;
+        }
+        public TnetString(List<TnetString> data)
+        {
+            this.ListValue = data;
+            this.Type = TnetStringType.List;
+        }
+        public TnetString(bool data)
+        {
+            this.BoolValue = data;
+            this.Type = TnetStringType.Bool;
+        }
+        public TnetString(ArraySegment<byte> data)
+        {
+            this.StringValue = data;
+            this.Type = TnetStringType.String;
+        }
+        public TnetString()
+        {
+            this.Type = TnetStringType.Null;
+        }
+
+        public TnetStringType Type;
+        public int IntValue;
+        public Dictionary<string, TnetString> DictValue;
+        public List<TnetString> ListValue;
+        public bool BoolValue = false;
+        public ArraySegment<byte> StringValue;
+    }
+
     public static class Tnetstring
     {
         private struct TnetstringPayload
@@ -21,27 +71,19 @@ namespace m2net
             public ArraySegment<byte> Remain;
         }
 
-        public struct TParseResult<T>
+        public struct TParseResult
         {
-            public TParseResult(T data, ArraySegment<byte> remain)
+            public TParseResult(TnetString data, ArraySegment<byte> remain)
             {
                 this.Data = data;
                 this.Remain = remain;
             }
 
-            public T Data;
+            public TnetString Data;
             public ArraySegment<byte> Remain;
         }
 
-        static TParseResult<T> TParse<T>(this ArraySegment<byte> data)
-        {
-            var parsed = TParse(data);
-
-            //TODO: handel ~ null
-            return new TParseResult<T>((T)parsed.Data, parsed.Remain);
-        }
-
-        public static TParseResult<object> TParse(this ArraySegment<byte> data)
+        public static TParseResult TParse(this ArraySegment<byte> data)
         {
             var parsed = TParsePayload(data);
             var payload = parsed.Payload;
@@ -51,19 +93,19 @@ namespace m2net
             switch (payloadType)
             {
                 case '#':
-                    return new TParseResult<object>(int.Parse(payload.ToAsciiString()), remain);
+                    return new TParseResult(new TnetString(int.Parse(payload.ToAsciiString())), remain);
                 case '}':
-                    return new TParseResult<object>(ParseDict(payload), remain);
+                    return new TParseResult(ParseDict(payload), remain);
                 case ']':
-                    return new TParseResult<object>(ParseList(payload), remain);
+                    return new TParseResult(ParseList(payload), remain);
                 case '!':
-                    return new TParseResult<object>(payload.ToAsciiString() == "true", remain);
+                    return new TParseResult(new TnetString(payload.ToAsciiString() == "true"), remain);
                 case '~':
                     if (payload.Count != 0)
                         throw new Exception("Payload must be 0 length for null.");
-                    return new TParseResult<object>(null, remain);
+                    return new TParseResult(new TnetString(), remain);
                 case ',':
-                    return new TParseResult<object>(payload, remain);
+                    return new TParseResult(new TnetString(payload), remain);
                 default:
                     throw new Exception("Invalid payload type: " + payloadType);
             }
@@ -103,9 +145,9 @@ namespace m2net
             return new TnetstringPayload(payload, payloadType, remain);
         }
 
-        static IList<object> ParseList(ArraySegment<byte> data)
+        static TnetString ParseList(ArraySegment<byte> data)
         {
-            var ret = new List<object>();
+            var ret = new List<TnetString>();
 
             while (data.Count != 0)
             {
@@ -114,13 +156,13 @@ namespace m2net
                 data = parsed.Remain;
             }
 
-            return ret;
+            return new TnetString(ret);
         }
 
         private struct TPair
         {
             public string Key;
-            public object Value;
+            public TnetString Value;
             public ArraySegment<byte> Extra;
         }
 
@@ -128,28 +170,24 @@ namespace m2net
         {
             var parsed = data.TParse();
 
-            if (!(parsed.Data is ArraySegment<byte>))
+            if (parsed.Data.Type != TnetStringType.String)
                 throw new Exception("Dictionary key must be a string.");
 
-            var key = ((ArraySegment<byte>)parsed.Data).ToAsciiString();
+            var key = parsed.Data.StringValue.ToAsciiString();
             var extra = parsed.Remain;
 
             if (extra.Count == 0)
                 throw new Exception("Unbalanced dictionary store.");
 
             parsed = extra.TParse();
-            var val = parsed.Data;
             extra = parsed.Remain;
 
-            if (val == null)
-                throw new Exception("Got an invalid value, null not allowed.");
-
-            return new TPair() { Key = key, Value = val, Extra = extra };
+            return new TPair() { Key = key, Value = parsed.Data, Extra = extra };
         }
 
-        static Dictionary<string, object> ParseDict(ArraySegment<byte> data)
+        static TnetString ParseDict(ArraySegment<byte> data)
         {
-            var ret = new Dictionary<string, object>();
+            var ret = new Dictionary<string, TnetString>();
 
             while (data.Count != 0)
             {
@@ -158,7 +196,7 @@ namespace m2net
                 data = pair.Extra;
             }
 
-            return ret;
+            return new TnetString(ret);
         }
     }
 }

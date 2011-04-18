@@ -57,15 +57,21 @@ namespace m2net
 
             var body = rest.ParseNetstring()[0];
 
-            var headersDic = headers is ArraySegment<byte> ? ParseJsonHeaders(headers) : ParseTnsHeaders(headers);
+            Dictionary<string, string> headersDic;
+            if (headers.Type == TnetStringType.String)
+                headersDic = ParseJsonHeaders(headers.StringValue);
+            else if (headers.Type == TnetStringType.Dict)
+                headersDic = ParseTnsHeaders(headers.DictValue);
+            else
+                throw new Exception("Unknown header payload.");
 
             return new Request(sender, conn_id, path, headersDic, body.ToArray());
         }
 
-        private static Dictionary<string, string> ParseJsonHeaders(object data)
+        private static Dictionary<string, string> ParseJsonHeaders(ArraySegment<byte> data)
         {
             var headers = new Dictionary<string, string>();
-            foreach (var h in JsonBuffer.From(((ArraySegment<byte>)data).ToAsciiString()).GetMembers())
+            foreach (var h in JsonBuffer.From(data.ToAsciiString()).GetMembers())
             {
                 var key = h.Name;
                 if (h.Buffer.IsScalar)
@@ -90,27 +96,31 @@ namespace m2net
             return headers;
         }
 
-        private static Dictionary<string, string> ParseTnsHeaders(object data)
+        private static Dictionary<string, string> ParseTnsHeaders(Dictionary<string, TnetString> objDic)
         {
-            var objDic = data as Dictionary<string, object>;
             var ret = new Dictionary<string, string>();
 
             foreach (var kvp in objDic)
             {
                 var key = kvp.Key;
-                if (kvp.Value is ArraySegment<byte>)
+                if (kvp.Value.Type == TnetStringType.String)
                 {
-                    var value = (ArraySegment<byte>)kvp.Value;
-                    ret.Add(key, value.ToAsciiString());
+                    ret.Add(key, kvp.Value.StringValue.ToAsciiString());
                 }
-                else
+                else if (kvp.Value.Type == TnetStringType.List)
                 {
-                    foreach (ArraySegment<byte> value in (List<object>)kvp.Value)
+                    foreach (TnetString value in kvp.Value.ListValue)
                     {
                         if (ret.ContainsKey(key))
                             break; //TODO: many headers
-                        ret.Add(key, value.ToAsciiString());
+                        if (value.Type != TnetStringType.String)
+                            throw new Exception("Expected string values.");
+                        ret.Add(key, value.StringValue.ToAsciiString());
                     }
+                }
+                else
+                {
+                    throw new Exception("Unexpected header type.");
                 }
             }
 
