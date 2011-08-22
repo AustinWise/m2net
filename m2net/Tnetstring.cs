@@ -12,7 +12,8 @@ namespace m2net
         List,
         Bool,
         Null,
-        String
+        String,
+        Float,
     }
 
     public class TnetString
@@ -21,6 +22,11 @@ namespace m2net
         {
             this.IntValue = data;
             this.Type = TnetStringType.Int;
+        }
+        public TnetString(double data)
+        {
+            this.FloatValue = data;
+            this.Type = TnetStringType.Float;
         }
         public TnetString(Dictionary<string, TnetString> data)
         {
@@ -49,6 +55,7 @@ namespace m2net
 
         public TnetStringType Type;
         public int IntValue;
+        public double FloatValue;
         public Dictionary<string, TnetString> DictValue;
         public List<TnetString> ListValue;
         public bool BoolValue = false;
@@ -94,6 +101,8 @@ namespace m2net
             {
                 case '#':
                     return new TParseResult(new TnetString(int.Parse(payload.ToAsciiString())), remain);
+                case '^':
+                    return new TParseResult(new TnetString(double.Parse(payload.ToAsciiString())), remain);
                 case '}':
                     return new TParseResult(ParseDict(payload), remain);
                 case ']':
