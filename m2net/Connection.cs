@@ -172,6 +172,11 @@ namespace m2net
             this.Send(req.Sender, req.ConnId, msg, offset, length);
         }
 
+        public void Reply(Request req, ArraySegment<byte> msg)
+        {
+            this.Send(req.Sender, req.ConnId, msg.Array, msg.Offset, msg.Count);
+        }
+
         public void Reply(Request req, byte[] msg)
         {
             this.Send(req.Sender, req.ConnId, msg);
@@ -183,10 +188,10 @@ namespace m2net
         }
 
         private const string HTTP_FORMAT = "HTTP/1.1 {0} {1}\r\n{2}\r\n";
-        private byte[] httpResponse(string body, int code, string status, Dictionary<string, string> headers)
+        private byte[] httpResponse(ArraySegment<byte> body, int code, string status, IDictionary<string, string> headers)
         {
-            var bodyBytes = Enc.GetBytes(body);
-            headers["Content-Length"] = bodyBytes.Length.ToString();
+            var bodyBytes = body;
+            headers["Content-Length"] = bodyBytes.Count.ToString();
             var formattedHeaders = new StringBuilder();
 
             foreach (var kvp in headers)
@@ -196,13 +201,35 @@ namespace m2net
 
             var header = string.Format(HTTP_FORMAT, code, status, formattedHeaders);
             var headerBytes = Enc.GetBytes(header);
-            var ret = new byte[bodyBytes.Length + headerBytes.Length];
+            var ret = new byte[bodyBytes.Count + headerBytes.Length];
             Array.Copy(headerBytes, ret, headerBytes.Length);
-            Array.Copy(bodyBytes, 0, ret, headerBytes.Length, bodyBytes.Length);
+            Array.Copy(bodyBytes.Array, bodyBytes.Offset, ret, headerBytes.Length, bodyBytes.Count);
             return ret;
         }
 
-        public void ReplyHttp(Request req, string body, int code, string status, Dictionary<string, string> headers)
+        private byte[] httpResponse(byte[] body, int code, string status, IDictionary<string, string> headers)
+        {
+            return httpResponse(new ArraySegment<byte>(body), code, status, headers);
+        }
+
+        private byte[] httpResponse(string body, int code, string status, IDictionary<string, string> headers)
+        {
+            return httpResponse(Enc.GetBytes(body), code, status, headers);
+        }
+
+        public void ReplyHttp(Request req, string body, int code, string status, IDictionary<string, string> headers)
+        {
+            var thingToSend = httpResponse(body, code, status, headers);
+            this.Reply(req, thingToSend);
+        }
+
+        public void ReplyHttp(Request req, byte[] body, int code, string status, IDictionary<string, string> headers)
+        {
+            var thingToSend = httpResponse(body, code, status, headers);
+            this.Reply(req, thingToSend);
+        }
+
+        public void ReplyHttp(Request req, ArraySegment<byte> body, int code, string status, IDictionary<string, string> headers)
         {
             var thingToSend = httpResponse(body, code, status, headers);
             this.Reply(req, thingToSend);
