@@ -90,6 +90,7 @@
   <ItemGroup>
     <Compile Include="ByteArrayExtensions.cs" />
     <Compile Include="Connection.cs" />
+    <Compile Include="OwinServer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Request.cs" />
     <Compile Include="Tnetstring.cs" />
