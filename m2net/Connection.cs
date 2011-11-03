@@ -52,7 +52,7 @@ namespace m2net
 
             resp = CTX.Socket(ZMQ.SocketType.PUB);
             resp.Connect(pub_addr);
-            resp.SetSockOpt(ZMQ.SocketOpt.IDENTITY, System.Text.ASCIIEncoding.Unicode.GetBytes(SenderId));
+            resp.SetSockOpt(ZMQ.SocketOpt.IDENTITY, System.Text.Encoding.ASCII.GetBytes(SenderId));
 
             while (isRunning)
             {
@@ -71,9 +71,19 @@ namespace m2net
                                 resp.Send(stuffToSend);
                                 sentOk = true;
                             }
-                            catch
+                            catch( ZMQ.Exception ex )
                             {
-                                sentOk = false;
+                                // This is almost certainly not portable for now
+                                // Have lodged a bug against clrzmq2:
+                                // https://github.com/zeromq/clrzmq2/issues/32
+                                if (ex.Errno == 11)
+                                {
+                                    sentOk = false;
+                                }
+                                else
+                                {
+                                    throw ex;
+                                }
                             }
                         }
                     }
