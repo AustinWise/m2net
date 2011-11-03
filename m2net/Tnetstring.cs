@@ -62,7 +62,7 @@ namespace m2net
         public ArraySegment<byte> StringValue;
     }
 
-    public static class Tnetstring
+    public static class TnetstringExtension
     {
         private struct TnetstringPayload
         {
@@ -119,7 +119,7 @@ namespace m2net
                     throw new Exception("Invalid payload type: " + payloadType);
             }
 
-            throw new NotImplementedException();
+            throw new NotSupportedException("Invalid payloadType '" + payloadType + "'.");
         }
 
         static TnetstringPayload TParsePayload(this ArraySegment<byte> data)

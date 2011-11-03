@@ -34,6 +34,11 @@ namespace m2net
             return Encoding.ASCII.GetString(bytes.Array, bytes.Offset, bytes.Count);
         }
 
+        public static string ToString(this ArraySegment<byte> bytes, Encoding enc)
+        {
+            return enc.GetString(bytes.Array, bytes.Offset, bytes.Count);
+        }
+
         public static byte[] ToArray(this ArraySegment<byte> seg)
         {
             byte[] copy = new byte[seg.Count];
