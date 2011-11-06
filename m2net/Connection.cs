@@ -52,7 +52,7 @@ namespace m2net
 
             resp = CTX.Socket(ZMQ.SocketType.PUB);
             resp.Connect(pub_addr);
-            resp.SetSockOpt(ZMQ.SocketOpt.IDENTITY, System.Text.Encoding.ASCII.GetBytes(SenderId));
+            resp.Subscribe(SenderId, Encoding.ASCII);
 
             while (isRunning)
             {
@@ -71,7 +71,7 @@ namespace m2net
                                 resp.Send(stuffToSend);
                                 sentOk = true;
                             }
-                            catch( ZMQ.Exception ex )
+                            catch (ZMQ.Exception ex)
                             {
                                 // This is almost certainly not portable for now
                                 // Have lodged a bug against clrzmq2:
@@ -107,7 +107,7 @@ namespace m2net
 
             while (isRunning)
             {
-                foreach ( byte[] data in reqs.RecvAll(ZMQ.SendRecvOpt.NOBLOCK) )
+                foreach (byte[] data in reqs.RecvAll(ZMQ.SendRecvOpt.NOBLOCK))
                 {
                     recvQ.Enqueue(data);
                     itemsReadyToRecv.Set();
