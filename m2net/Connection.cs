@@ -50,9 +50,9 @@ namespace m2net
         {
             ZMQ.Socket resp;
 
-            resp = CTX.Socket(ZMQ.PUB);
+            resp = CTX.Socket(ZMQ.SocketType.PUB);
             resp.Connect(pub_addr);
-            resp.SetSockOpt(ZMQ.IDENTITY, SenderId);
+            resp.SetSockOpt(ZMQ.SocketOpt.IDENTITY, System.Text.Encoding.ASCII.GetBytes(SenderId));
 
             while (isRunning)
             {
@@ -62,8 +62,30 @@ namespace m2net
                     while (sendQ.Count != 0)
                     {
                         byte[] stuffToSend = sendQ.Dequeue();
-                        while (!resp.Send(stuffToSend))
-                            ;
+
+                        bool sentOk = false;
+                        while (!sentOk)
+                        {
+                            try
+                            {
+                                resp.Send(stuffToSend);
+                                sentOk = true;
+                            }
+                            catch( ZMQ.Exception ex )
+                            {
+                                // This is almost certainly not portable for now
+                                // Have lodged a bug against clrzmq2:
+                                // https://github.com/zeromq/clrzmq2/issues/32
+                                if (ex.Errno == 11)
+                                {
+                                    sentOk = false;
+                                }
+                                else
+                                {
+                                    throw ex;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -80,26 +102,17 @@ namespace m2net
             if (!isRunning)
                 throw new ObjectDisposedException("Connection");
 
-            reqs = CTX.Socket(ZMQ.PULL);
+            reqs = CTX.Socket(ZMQ.SocketType.PULL);
             reqs.Connect(sub_addr);
 
             while (isRunning)
             {
-                byte[] data;
-                bool gotIt = reqs.Recv(out data, ZMQ.NOBLOCK);
-
-                if (gotIt)
+                foreach ( byte[] data in reqs.RecvAll(ZMQ.SendRecvOpt.NOBLOCK) )
                 {
-                    lock (recvQ)
-                    {
-                        recvQ.Enqueue(data);
-                    }
+                    recvQ.Enqueue(data);
                     itemsReadyToRecv.Set();
                 }
-                else
-                {
-                    Thread.Sleep(1);
-                }
+                Thread.Sleep(1);
             }
 
             reqs.Dispose();
