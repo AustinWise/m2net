@@ -61,31 +61,64 @@ namespace m2net
             return dic;
         }
 
+        private class InFlightResponse
+        {
+            private Request mRequest;
+            private IDictionary<string, string> mHeaders;
+            private Connection mConnection;
+            private int mResponseCode;
+            private string mReponseMessage;
+
+            public InFlightResponse(Connection connection, Request request, IDictionary<string, string> headers,
+                int resCode, string resMessage)
+            {
+                this.mConnection = connection;
+                this.mRequest = request;
+                this.mHeaders = headers;
+                this.mResponseCode = resCode;
+                this.mReponseMessage = resMessage;
+            }
+
+            public bool OnNext(ArraySegment<byte> bodyBytes, Action continuation)
+            {
+                lock (this)
+                {
+                    if (mHeaders == null)
+                        mConnection.Reply(mRequest, bodyBytes);
+                    else
+                    {
+                        mConnection.ReplyHttp(mRequest, bodyBytes, mResponseCode, mReponseMessage, mHeaders);
+                        mHeaders = null;
+                    }
+                    return false;
+                }
+            }
+
+            public void OnError(Exception ex)
+            {
+            }
+
+            public void OnComplete()
+            {
+            }
+        }
+
+        private void SendResponse(Request req, string code, IDictionary<string, string> headers, BodyDelegate body)
+        {
+            var splitCode = code.Split(new[] { ' ' }, 1);
+            var intCode = int.Parse(splitCode[0]);
+
+            var res = new InFlightResponse(conn, req, headers, intCode, splitCode[1]);
+            body(res.OnNext, res.OnError, res.OnComplete);
+        }
+
         public void Host(OwinApplication app)
         {
             while (true)
             {
                 var req = conn.Receive();
                 var owinReq = convertRequestToOwin(req);
-                app(owinReq, (code, headers, body) =>
-                {
-                    var splitCode = code.Split(new[] { ' ' }, 1);
-                    var intCode = int.Parse(splitCode[0]);
-
-                    bool sentHeads = false;
-
-                    body((bodyBytes, _) =>
-                    {
-                        if (sentHeads)
-                            conn.Reply(req, bodyBytes);
-                        else
-                        {
-                            conn.ReplyHttp(req, bodyBytes, intCode, splitCode[1], headers);
-                            sentHeads = true;
-                        }
-                        return false;
-                    }, null, null);
-                }, _ => { });
+                app(owinReq, (code, headers, body) => SendResponse(req, code, headers, body), _ => { });
             }
         }
     }
