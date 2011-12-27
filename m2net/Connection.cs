@@ -73,10 +73,7 @@ namespace m2net
                             }
                             catch (ZMQ.Exception ex)
                             {
-                                // This is almost certainly not portable for now
-                                // Have lodged a bug against clrzmq2:
-                                // https://github.com/zeromq/clrzmq2/issues/32
-                                if (ex.Errno == 11)
+                                if( ex.Errno == (int)ZMQ.ERRNOS.EAGAIN )
                                 {
                                     sentOk = false;
                                 }
