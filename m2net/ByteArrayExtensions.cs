@@ -24,6 +24,11 @@ namespace m2net
             return new ArraySegment<T>(data, startIndex, length);
         }
 
+        public static string ToString(this ArraySegment<byte> bytes, Encoding enc)
+        {
+            return enc.GetString(bytes.Array, bytes.Offset, bytes.Count);
+        }
+
         public static string ToAsciiString(this byte[] bytes)
         {
             return Encoding.ASCII.GetString(bytes);
