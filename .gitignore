@@ -4,3 +4,4 @@ bin
 obj
 *.cache
 TestResults
+packages
