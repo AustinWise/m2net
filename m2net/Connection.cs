@@ -51,8 +51,11 @@ namespace m2net
             ZMQ.Socket resp;
 
             resp = CTX.Socket(ZMQ.SocketType.PUB);
+            if (!string.IsNullOrEmpty(SenderId))
+            {
+                resp.Identity = Encoding.ASCII.GetBytes(SenderId);
+            }
             resp.Connect(pub_addr);
-            resp.Subscribe(SenderId, Encoding.ASCII);
 
             while (isRunning)
             {
