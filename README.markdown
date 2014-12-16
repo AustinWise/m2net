@@ -4,26 +4,31 @@ m2net, a .NET library to develop [Mongrel2] handlers
 [m2net] helps you develop Mongrel2 handlers. It also comes with a rough port of the
 [Cassini] ASP.NET web server to use m2net instead of sockets.
 
+nuget
+-----
+
+The libary is available on [Nuget].
+
+
 Dependencies
 ------------
 
- - .NET Framework 3.5 (Can be compiled against the 2.0 BCL if you add add your own ExtensionAttribute)
- - [libzmq.dll](http://www.zeromq.org/) (included)
- - [clrzmq](http://github.com/zeromq/clrzmq/) (included)
- - [Jayrock.JSON](http://jayrock.berlios.de/) (included)
+ - .NET Framework 4.0
+ - [clrzmq](http://packages.nuget.org/packages/clrzmq-x64/)
+ - [Jayrock.JSON](http://packages.nuget.org/packages/jayrock-json/)
 
 
 License
 -------
 
-m2net is licensed under the BSD license.  m2net.asp is licensed under the [Microsoft Public License], since it is derived from Cassini.
+m2net is licensed under the 3-clause [BSD License].  m2net.asp is licensed under
+the [Microsoft Public License], since it is derived from Cassini.
 
 
 Currently limitations
 ---------------------
 
-* Only works with x86 .NET apps on Windows.  That is, it will run just fine
-  under x64 Windows just as long as you compile it as X86 and not AnyCPU or x64.
+* Only works with x64 .NET apps on Windows. This should be improved in the next release.
 
 
 Areas for improvement
@@ -41,3 +46,5 @@ Areas for improvement
   [Cassini]:http://blogs.msdn.com/b/dmitryr/archive/2008/10/03/cassini-for-framework-3-5.aspx
   [Mongrel2]:http://mongrel2.org/
   [Microsoft Public License]:http://www.opensource.org/licenses/ms-pl.html
+  [BSD License]:http://en.wikipedia.org/wiki/BSD_licenses#3-clause_license_.28.22Revised_BSD_License.22.2C_.22New_BSD_License.22.2C_or_.22Modified_BSD_License.22.29
+  [Nuget]:https://www.nuget.org/packages/m2net/
