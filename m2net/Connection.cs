@@ -27,11 +27,14 @@ namespace m2net
         private int threadStillRunning = 2;
 
         public Connection(string sender_id, string sub_addr, string pub_addr)
+            : this(new ZMQ.Context(1), sender_id, sub_addr, pub_addr)
         {
-            CTX = new ZMQ.Context(IoThreads);
+        }
 
+        public Connection(ZMQ.Context ctx, string sender_id, string sub_addr, string pub_addr)
+        {
+            CTX = ctx;
             this.SenderId = sender_id;
-
             this.sub_addr = sub_addr;
             this.pub_addr = pub_addr;
 
@@ -48,9 +51,7 @@ namespace m2net
 
         private void sendProc()
         {
-            ZMQ.Socket resp;
-
-            resp = CTX.Socket(ZMQ.SocketType.PUB);
+            ZMQ.Socket resp = CTX.Socket(ZMQ.SocketType.PUB);
             if (!string.IsNullOrEmpty(SenderId))
             {
                 resp.Identity = Encoding.ASCII.GetBytes(SenderId);
@@ -97,22 +98,22 @@ namespace m2net
 
         private void recvProc()
         {
-            ZMQ.Socket reqs;
-
-            if (!isRunning)
-                throw new ObjectDisposedException("Connection");
-
-            reqs = CTX.Socket(ZMQ.SocketType.PULL);
+            ZMQ.Socket reqs = CTX.Socket(ZMQ.SocketType.PULL);
             reqs.Connect(sub_addr);
 
+            var items = new[] { reqs.CreatePollItem(ZMQ.IOMultiPlex.POLLIN | ZMQ.IOMultiPlex.POLLERR) };
             while (isRunning)
             {
+                int res = CTX.Poll(items, 1000 * 1000);
+                if (res == 0)
+                    continue;
                 foreach (byte[] data in reqs.RecvAll(ZMQ.SendRecvOpt.NOBLOCK))
                 {
+                    if (data == null)
+                        continue;
                     recvQ.Enqueue(data);
                     itemsReadyToRecv.Set();
                 }
-                Thread.Sleep(1);
             }
 
             reqs.Dispose();
