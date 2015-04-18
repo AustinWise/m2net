@@ -1,4 +1,3 @@
-
 GMCS_FLAGS=-define:MONO -keyfile:key.snk
 LIBS=-r:lib/Jayrock.Json.dll -r:lib/clrzmq.dll
 
